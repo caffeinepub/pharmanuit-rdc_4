@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Pharmacy, SubmitResult } from "../backend.d";
+import type { Pharmacy, RegisterResult, SubmitResult } from "../backend.d";
 import { useActor } from "./useActor";
 
 export function useApprovedPharmacies() {
@@ -124,6 +124,51 @@ export function useInitializeSeedData() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["allPharmacies"] });
       queryClient.invalidateQueries({ queryKey: ["approvedPharmacies"] });
+    },
+  });
+}
+
+export function useRegisterPharmacist() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation<
+    RegisterResult,
+    Error,
+    {
+      email: string;
+      nom: string;
+      tel: string;
+      adresse: string;
+      ouvert: boolean;
+    }
+  >({
+    mutationFn: async ({ email, nom, tel, adresse, ouvert }) => {
+      if (!actor) throw new Error("Actor not available");
+      return actor.registerPharmacist(email, nom, tel, adresse, ouvert);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["allPharmacies"] });
+      queryClient.invalidateQueries({ queryKey: ["approvedPharmacies"] });
+    },
+  });
+}
+
+export function useLoginPharmacist() {
+  const { actor } = useActor();
+  return useMutation<Pharmacy | null, Error, { email: string; code: string }>({
+    mutationFn: async ({ email, code }) => {
+      if (!actor) throw new Error("Actor not available");
+      return actor.loginPharmacist(email, code);
+    },
+  });
+}
+
+export function useGetPharmacyByEmail() {
+  const { actor } = useActor();
+  return useMutation<Pharmacy | null, Error, string>({
+    mutationFn: async (email: string) => {
+      if (!actor) throw new Error("Actor not available");
+      return actor.getPharmacyByEmail(email);
     },
   });
 }

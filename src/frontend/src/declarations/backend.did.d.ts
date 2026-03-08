@@ -19,10 +19,12 @@ export interface Pharmacy {
   'statut' : string,
   'ouvert' : boolean,
   'codeSecret' : string,
+  'email' : string,
   'approuve' : boolean,
   'visible' : boolean,
   'adresse' : string,
 }
+export interface RegisterResult { 'id' : bigint, 'code' : string }
 export interface SubmitResult { 'id' : bigint, 'code' : string }
 export interface UserProfile {
   'name' : string,
@@ -41,9 +43,15 @@ export interface _SERVICE {
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
   'getPharmacyByCode' : ActorMethod<[string], [] | [Pharmacy]>,
+  'getPharmacyByEmail' : ActorMethod<[string], [] | [Pharmacy]>,
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
   'initializeSeedData' : ActorMethod<[], undefined>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
+  'loginPharmacist' : ActorMethod<[string, string], [] | [Pharmacy]>,
+  'registerPharmacist' : ActorMethod<
+    [string, string, string, string, boolean],
+    RegisterResult
+  >,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'setPharmacyOpenStatus' : ActorMethod<[bigint, boolean], boolean>,
   'submitPharmacy' : ActorMethod<[string, string, string], SubmitResult>,

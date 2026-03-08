@@ -22,6 +22,7 @@ export const Pharmacy = IDL.Record({
   'statut' : IDL.Text,
   'ouvert' : IDL.Bool,
   'codeSecret' : IDL.Text,
+  'email' : IDL.Text,
   'approuve' : IDL.Bool,
   'visible' : IDL.Bool,
   'adresse' : IDL.Text,
@@ -31,6 +32,7 @@ export const UserProfile = IDL.Record({
   'email' : IDL.Text,
   'phone' : IDL.Text,
 });
+export const RegisterResult = IDL.Record({ 'id' : IDL.Nat, 'code' : IDL.Text });
 export const SubmitResult = IDL.Record({ 'id' : IDL.Nat, 'code' : IDL.Text });
 
 export const idlService = IDL.Service({
@@ -42,6 +44,7 @@ export const idlService = IDL.Service({
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
   'getPharmacyByCode' : IDL.Func([IDL.Text], [IDL.Opt(Pharmacy)], ['query']),
+  'getPharmacyByEmail' : IDL.Func([IDL.Text], [IDL.Opt(Pharmacy)], ['query']),
   'getUserProfile' : IDL.Func(
       [IDL.Principal],
       [IDL.Opt(UserProfile)],
@@ -49,6 +52,16 @@ export const idlService = IDL.Service({
     ),
   'initializeSeedData' : IDL.Func([], [], []),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
+  'loginPharmacist' : IDL.Func(
+      [IDL.Text, IDL.Text],
+      [IDL.Opt(Pharmacy)],
+      ['query'],
+    ),
+  'registerPharmacist' : IDL.Func(
+      [IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Bool],
+      [RegisterResult],
+      [],
+    ),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
   'setPharmacyOpenStatus' : IDL.Func([IDL.Nat, IDL.Bool], [IDL.Bool], []),
   'submitPharmacy' : IDL.Func(
@@ -76,6 +89,7 @@ export const idlFactory = ({ IDL }) => {
     'statut' : IDL.Text,
     'ouvert' : IDL.Bool,
     'codeSecret' : IDL.Text,
+    'email' : IDL.Text,
     'approuve' : IDL.Bool,
     'visible' : IDL.Bool,
     'adresse' : IDL.Text,
@@ -85,6 +99,7 @@ export const idlFactory = ({ IDL }) => {
     'email' : IDL.Text,
     'phone' : IDL.Text,
   });
+  const RegisterResult = IDL.Record({ 'id' : IDL.Nat, 'code' : IDL.Text });
   const SubmitResult = IDL.Record({ 'id' : IDL.Nat, 'code' : IDL.Text });
   
   return IDL.Service({
@@ -96,6 +111,7 @@ export const idlFactory = ({ IDL }) => {
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
     'getPharmacyByCode' : IDL.Func([IDL.Text], [IDL.Opt(Pharmacy)], ['query']),
+    'getPharmacyByEmail' : IDL.Func([IDL.Text], [IDL.Opt(Pharmacy)], ['query']),
     'getUserProfile' : IDL.Func(
         [IDL.Principal],
         [IDL.Opt(UserProfile)],
@@ -103,6 +119,16 @@ export const idlFactory = ({ IDL }) => {
       ),
     'initializeSeedData' : IDL.Func([], [], []),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
+    'loginPharmacist' : IDL.Func(
+        [IDL.Text, IDL.Text],
+        [IDL.Opt(Pharmacy)],
+        ['query'],
+      ),
+    'registerPharmacist' : IDL.Func(
+        [IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Bool],
+        [RegisterResult],
+        [],
+      ),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
     'setPharmacyOpenStatus' : IDL.Func([IDL.Nat, IDL.Bool], [IDL.Bool], []),
     'submitPharmacy' : IDL.Func(

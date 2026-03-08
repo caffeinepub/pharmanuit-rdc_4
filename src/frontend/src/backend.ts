@@ -93,6 +93,10 @@ export interface SubmitResult {
     id: bigint;
     code: string;
 }
+export interface RegisterResult {
+    id: bigint;
+    code: string;
+}
 export interface Pharmacy {
     id: bigint;
     lat: number;
@@ -102,6 +106,7 @@ export interface Pharmacy {
     statut: string;
     ouvert: boolean;
     codeSecret: string;
+    email: string;
     approuve: boolean;
     visible: boolean;
     adresse: string;
@@ -125,9 +130,12 @@ export interface backendInterface {
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
     getPharmacyByCode(code: string): Promise<Pharmacy | null>;
+    getPharmacyByEmail(email: string): Promise<Pharmacy | null>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     initializeSeedData(): Promise<void>;
     isCallerAdmin(): Promise<boolean>;
+    loginPharmacist(email: string, code: string): Promise<Pharmacy | null>;
+    registerPharmacist(email: string, nom: string, tel: string, adresse: string, ouvert: boolean): Promise<RegisterResult>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     setPharmacyOpenStatus(id: bigint, isOpen: boolean): Promise<boolean>;
     submitPharmacy(nom: string, tel: string, adresse: string): Promise<SubmitResult>;
@@ -248,6 +256,20 @@ export class Backend implements backendInterface {
             return from_candid_opt_n6(this._uploadFile, this._downloadFile, result);
         }
     }
+    async getPharmacyByEmail(arg0: string): Promise<Pharmacy | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getPharmacyByEmail(arg0);
+                return from_candid_opt_n6(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getPharmacyByEmail(arg0);
+            return from_candid_opt_n6(this._uploadFile, this._downloadFile, result);
+        }
+    }
     async getUserProfile(arg0: Principal): Promise<UserProfile | null> {
         if (this.processError) {
             try {
@@ -287,6 +309,34 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.isCallerAdmin();
+            return result;
+        }
+    }
+    async loginPharmacist(arg0: string, arg1: string): Promise<Pharmacy | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.loginPharmacist(arg0, arg1);
+                return from_candid_opt_n6(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.loginPharmacist(arg0, arg1);
+            return from_candid_opt_n6(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async registerPharmacist(arg0: string, arg1: string, arg2: string, arg3: string, arg4: boolean): Promise<RegisterResult> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.registerPharmacist(arg0, arg1, arg2, arg3, arg4);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.registerPharmacist(arg0, arg1, arg2, arg3, arg4);
             return result;
         }
     }

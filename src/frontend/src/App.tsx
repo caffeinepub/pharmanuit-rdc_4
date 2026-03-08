@@ -4,10 +4,11 @@ import {
   useAllPharmacies,
   useApprovedPharmacies,
   useDeletePharmacy,
-  useGetPharmacyByCode,
+  useGetPharmacyByEmail,
   useInitializeSeedData,
+  useLoginPharmacist,
+  useRegisterPharmacist,
   useSetPharmacyOpenStatus,
-  useSubmitPharmacy,
   useTogglePharmacyVisibility,
 } from "./hooks/useQueries";
 
@@ -295,17 +296,6 @@ function HomeScreen({ onNavigate }: { onNavigate: (s: Screen) => void }) {
         >
           <span style={{ fontSize: "1.25rem" }}>🔍</span>
           Trouver pharmacie proche
-        </button>
-
-        <button
-          type="button"
-          data-ocid="home.itinerary.secondary_button"
-          className="pharma-btn-secondary"
-          onClick={() => onNavigate("nearby")}
-          style={{ minHeight: "64px" }}
-        >
-          <span style={{ fontSize: "1.25rem" }}>🗺️</span>
-          Itinéraire
         </button>
 
         <button
@@ -686,42 +676,84 @@ function NearbyScreen({ onBack }: { onBack: () => void }) {
 
 // ─── Screen: REGISTER ─────────────────────────────────────────────────────────
 function RegisterScreen({ onBack }: { onBack: () => void }) {
+  // Step 1: email entry | Step 2: pharmacy info | Step 3: show code
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [email, setEmail] = useState("");
   const [nom, setNom] = useState("");
   const [tel, setTel] = useState("");
   const [adresse, setAdresse] = useState("");
+  const [ouvert, setOuvert] = useState(true);
   const [secretCode, setSecretCode] = useState<string | null>(null);
-  const [submittedNom, setSubmittedNom] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
-  const { mutateAsync: submitPharmacy, isPending } = useSubmitPharmacy();
 
-  const handleSubmit = useCallback(
+  const { mutateAsync: getPharmacyByEmail, isPending: isCheckingEmail } =
+    useGetPharmacyByEmail();
+  const { mutateAsync: registerPharmacist, isPending: isRegistering } =
+    useRegisterPharmacist();
+
+  // Step 1 → Step 2: validate email and check if already registered
+  const handleEmailContinue = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
       setFormError(null);
-
-      if (!nom.trim() || !tel.trim() || !adresse.trim()) {
-        setFormError("Veuillez remplir tous les champs obligatoires.");
+      const trimmedEmail = email.trim();
+      if (!trimmedEmail) {
+        setFormError("Veuillez entrer votre adresse email.");
         return;
       }
-
+      // Basic email format check
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+        setFormError("Veuillez entrer une adresse email valide.");
+        return;
+      }
       try {
-        const trimmedNom = nom.trim();
-        const result = await submitPharmacy({
-          nom: trimmedNom,
-          tel: tel.trim(),
-          adresse: adresse.trim(),
-        });
-        setSubmittedNom(trimmedNom);
-        setSecretCode(result.code);
-        setNom("");
-        setTel("");
-        setAdresse("");
+        const existing = await getPharmacyByEmail(trimmedEmail);
+        if (existing) {
+          setFormError(
+            "Cet email est déjà enregistré. Utilisez l'espace pharmacien pour vous connecter.",
+          );
+          return;
+        }
+        setStep(2);
       } catch {
         setFormError("Une erreur s'est produite. Veuillez réessayer.");
       }
     },
-    [nom, tel, adresse, submitPharmacy],
+    [email, getPharmacyByEmail],
   );
+
+  // Step 2 → Step 3: register pharmacy
+  const handleRegister = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      setFormError(null);
+      if (!nom.trim() || !tel.trim() || !adresse.trim()) {
+        setFormError("Veuillez remplir tous les champs obligatoires.");
+        return;
+      }
+      try {
+        const result = await registerPharmacist({
+          email: email.trim(),
+          nom: nom.trim(),
+          tel: tel.trim(),
+          adresse: adresse.trim(),
+          ouvert,
+        });
+        setSecretCode(result.code);
+        setStep(3);
+      } catch {
+        setFormError("Une erreur s'est produite. Veuillez réessayer.");
+      }
+    },
+    [email, nom, tel, adresse, ouvert, registerPharmacist],
+  );
+
+  const stepSubtitle =
+    step === 1
+      ? "Étape 1 — Votre adresse email"
+      : step === 2
+        ? "Étape 2 — Informations de la pharmacie"
+        : "Enregistrement confirmé";
 
   return (
     <div
@@ -742,7 +774,18 @@ function RegisterScreen({ onBack }: { onBack: () => void }) {
           gap: "0.75rem",
         }}
       >
-        {!secretCode && <BackButton onClick={onBack} />}
+        {step !== 3 && (
+          <BackButton
+            onClick={() => {
+              if (step === 2) {
+                setStep(1);
+                setFormError(null);
+              } else {
+                onBack();
+              }
+            }}
+          />
+        )}
         <div>
           <h2
             style={{
@@ -756,182 +799,128 @@ function RegisterScreen({ onBack }: { onBack: () => void }) {
             Inscrire ma pharmacie
           </h2>
           <p style={{ color: "#888888", fontSize: "13px", margin: 0 }}>
-            {secretCode
-              ? "Enregistrement confirmé"
-              : "Soumission de votre pharmacie"}
+            {stepSubtitle}
           </p>
         </div>
       </header>
 
       <main style={{ flex: 1 }}>
-        {secretCode ? (
-          /* ── Success: show secret code ── */
-          <div
-            data-ocid="register.success_state"
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              textAlign: "center",
-              paddingTop: "1.5rem",
-              gap: "1.5rem",
-            }}
-          >
-            {/* Success icon */}
+        {/* ── Step 1: Email entry ── */}
+        {step === 1 && (
+          <form onSubmit={handleEmailContinue} noValidate>
             <div
-              style={{
-                background: "radial-gradient(circle, #0a2e17 0%, #050f0a 100%)",
-                borderRadius: "50%",
-                width: 96,
-                height: 96,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                border: "2px solid #00c85355",
-                boxShadow: "0 0 30px rgba(0,200,83,0.2)",
-                flexShrink: 0,
-              }}
+              style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
             >
-              <span style={{ fontSize: "3rem" }}>✅</span>
-            </div>
-
-            <div>
-              <h3
-                style={{
-                  fontSize: "1.375rem",
-                  fontWeight: 800,
-                  color: "#00c853",
-                  marginBottom: "0.625rem",
-                  lineHeight: 1.2,
-                }}
-              >
-                Pharmacie enregistrée !
-              </h3>
-              <p
-                style={{
-                  color: "#cccccc",
-                  fontSize: "15px",
-                  lineHeight: 1.7,
-                  maxWidth: "340px",
-                }}
-              >
-                <strong style={{ color: "#ffffff" }}>{submittedNom}</strong> a
-                été enregistrée avec succès. Notez bien votre code secret —
-                c'est votre unique clé d'accès à votre espace pharmacien.
-              </p>
-            </div>
-
-            {/* Secret code card */}
-            <div
-              data-ocid="register.code.card"
-              style={{
-                background: "linear-gradient(135deg, #0a2e17 0%, #082010 100%)",
-                border: "2px solid #00c853",
-                borderRadius: "1rem",
-                padding: "1.75rem 2rem",
-                width: "100%",
-                maxWidth: "340px",
-                boxSizing: "border-box",
-                boxShadow: "0 0 40px rgba(0,200,83,0.2)",
-              }}
-            >
-              <p
-                style={{
-                  color: "#00c853",
-                  fontSize: "12px",
-                  fontWeight: 700,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.1em",
-                  marginBottom: "0.875rem",
-                }}
-              >
-                🔑 Votre code secret
-              </p>
-              <div
-                style={{
-                  fontSize: "3rem",
-                  fontWeight: 900,
-                  color: "#ffffff",
-                  letterSpacing: "0.35em",
-                  fontFamily: "monospace",
-                  lineHeight: 1,
-                  marginBottom: "1rem",
-                  wordBreak: "break-all",
-                }}
-              >
-                {secretCode}
+              <div>
+                <label
+                  htmlFor="reg-email"
+                  style={{
+                    display: "block",
+                    color: "#cccccc",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    marginBottom: "0.5rem",
+                  }}
+                >
+                  Adresse Gmail <span style={{ color: "#00c853" }}>*</span>
+                </label>
+                <input
+                  id="reg-email"
+                  data-ocid="register.email.input"
+                  className="pharma-input"
+                  type="email"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (formError) setFormError(null);
+                  }}
+                  placeholder="exemple@gmail.com"
+                  required
+                  autoComplete="email"
+                  inputMode="email"
+                />
               </div>
-              <p
+
+              {formError && (
+                <div
+                  data-ocid="register.error_state"
+                  style={{
+                    background: "#2e0a0a",
+                    border: "1px solid #c62828",
+                    borderRadius: "0.75rem",
+                    padding: "0.875rem 1rem",
+                    color: "#ff5252",
+                    fontSize: "14px",
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: "0.5rem",
+                  }}
+                >
+                  <span style={{ flexShrink: 0 }}>❌</span>
+                  {formError}
+                </div>
+              )}
+
+              <button
+                data-ocid="register.email.submit_button"
+                className="pharma-btn-primary"
+                type="submit"
+                disabled={isCheckingEmail}
                 style={{
-                  color: "#aaaaaa",
-                  fontSize: "13px",
-                  lineHeight: 1.55,
-                  margin: 0,
+                  opacity: isCheckingEmail ? 0.7 : 1,
+                  minHeight: "60px",
+                  fontSize: "1.125rem",
                 }}
               >
-                📌 Notez ce code dans un endroit sûr. Sans ce code, vous ne
-                pourrez pas accéder à votre espace pharmacien.
-              </p>
+                {isCheckingEmail ? (
+                  <>
+                    <BtnSpinner />
+                    Vérification…
+                  </>
+                ) : (
+                  <>➡️ Continuer</>
+                )}
+              </button>
             </div>
+          </form>
+        )}
 
-            {/* Info */}
+        {/* ── Step 2: Pharmacy info ── */}
+        {step === 2 && (
+          <form onSubmit={handleRegister} noValidate>
             <div
-              className="pharma-card"
-              style={{
-                padding: "1rem",
-                display: "flex",
-                gap: "0.75rem",
-                alignItems: "flex-start",
-                width: "100%",
-                maxWidth: "340px",
-                boxSizing: "border-box",
-              }}
+              style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
             >
-              <span
-                style={{ fontSize: "1.125rem", flexShrink: 0, marginTop: 2 }}
-              >
-                ℹ️
-              </span>
-              <p
-                style={{
-                  color: "#888888",
-                  fontSize: "13px",
-                  lineHeight: 1.6,
-                  margin: 0,
-                }}
-              >
-                Pour accéder à votre espace pharmacien et gérer votre statut
-                ouvert/fermé, utilisez ce code secret dans l'espace pharmacien.
-              </p>
-            </div>
+              {/* Email (readonly) */}
+              <div>
+                <p
+                  style={{
+                    display: "block",
+                    color: "#666666",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    marginBottom: "0.375rem",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                  }}
+                >
+                  Email
+                </p>
+                <div
+                  style={{
+                    background: "#141414",
+                    border: "1px solid #2a2a2a",
+                    borderRadius: "0.75rem",
+                    padding: "0.875rem 1rem",
+                    color: "#666666",
+                    fontSize: "15px",
+                    fontFamily: "monospace",
+                  }}
+                >
+                  {email.trim()}
+                </div>
+              </div>
 
-            {/* Return home button */}
-            <button
-              type="button"
-              data-ocid="register.back.button"
-              className="pharma-btn-primary"
-              onClick={onBack}
-              style={{
-                width: "100%",
-                maxWidth: "340px",
-                minHeight: "56px",
-                fontSize: "1rem",
-              }}
-            >
-              <BackIcon />
-              Retour à l'accueil
-            </button>
-          </div>
-        ) : (
-          /* ── Registration form ── */
-          <form onSubmit={handleSubmit} noValidate>
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "1rem",
-              }}
-            >
               {/* Nom */}
               <div>
                 <label
@@ -1013,6 +1002,65 @@ function RegisterScreen({ onBack }: { onBack: () => void }) {
                 />
               </div>
 
+              {/* Statut initial toggle */}
+              <div>
+                <p
+                  style={{
+                    display: "block",
+                    color: "#cccccc",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    marginBottom: "0.625rem",
+                  }}
+                >
+                  Statut à l'ouverture
+                </p>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: "0.625rem",
+                  }}
+                >
+                  <button
+                    type="button"
+                    data-ocid="register.status_open.toggle"
+                    onClick={() => setOuvert(true)}
+                    style={{
+                      padding: "0.75rem",
+                      borderRadius: "0.75rem",
+                      border: `2px solid ${ouvert ? "#00c853" : "#2a2a2a"}`,
+                      background: ouvert ? "#0a2e17" : "#1a1a1a",
+                      color: ouvert ? "#00c853" : "#666666",
+                      fontSize: "15px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    🟢 Ouvert
+                  </button>
+                  <button
+                    type="button"
+                    data-ocid="register.status_closed.toggle"
+                    onClick={() => setOuvert(false)}
+                    style={{
+                      padding: "0.75rem",
+                      borderRadius: "0.75rem",
+                      border: `2px solid ${!ouvert ? "#ff5252" : "#2a2a2a"}`,
+                      background: !ouvert ? "#2e0a0a" : "#1a1a1a",
+                      color: !ouvert ? "#ff5252" : "#666666",
+                      fontSize: "15px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    🔴 Fermé
+                  </button>
+                </div>
+              </div>
+
               {formError && (
                 <div
                   data-ocid="register.error_state"
@@ -1024,11 +1072,12 @@ function RegisterScreen({ onBack }: { onBack: () => void }) {
                     color: "#ff5252",
                     fontSize: "14px",
                     display: "flex",
-                    alignItems: "center",
+                    alignItems: "flex-start",
                     gap: "0.5rem",
                   }}
                 >
-                  ❌ {formError}
+                  <span style={{ flexShrink: 0 }}>❌</span>
+                  {formError}
                 </div>
               )}
 
@@ -1036,28 +1085,194 @@ function RegisterScreen({ onBack }: { onBack: () => void }) {
                 data-ocid="register.submit.submit_button"
                 className="pharma-btn-primary"
                 type="submit"
-                disabled={isPending}
+                disabled={isRegistering}
                 style={{
-                  opacity: isPending ? 0.7 : 1,
+                  opacity: isRegistering ? 0.7 : 1,
                   minHeight: "60px",
                   fontSize: "1.125rem",
                 }}
               >
-                {isPending ? (
+                {isRegistering ? (
                   <>
                     <BtnSpinner />
-                    Envoi en cours…
+                    Enregistrement…
                   </>
                 ) : (
-                  <>📝 Soumettre ma pharmacie</>
+                  <>✅ Enregistrer ma pharmacie</>
                 )}
               </button>
             </div>
           </form>
         )}
+
+        {/* ── Step 3: Show code ── */}
+        {step === 3 && secretCode && (
+          <div
+            data-ocid="register.success_state"
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              textAlign: "center",
+              paddingTop: "1.5rem",
+              gap: "1.5rem",
+            }}
+          >
+            {/* Success icon */}
+            <div
+              style={{
+                background: "radial-gradient(circle, #0a2e17 0%, #050f0a 100%)",
+                borderRadius: "50%",
+                width: 96,
+                height: 96,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                border: "2px solid #00c85355",
+                boxShadow: "0 0 30px rgba(0,200,83,0.2)",
+                flexShrink: 0,
+              }}
+            >
+              <span style={{ fontSize: "3rem" }}>✅</span>
+            </div>
+
+            <div>
+              <h3
+                style={{
+                  fontSize: "1.375rem",
+                  fontWeight: 800,
+                  color: "#00c853",
+                  marginBottom: "0.625rem",
+                  lineHeight: 1.2,
+                }}
+              >
+                Pharmacie active !
+              </h3>
+              <p
+                style={{
+                  color: "#cccccc",
+                  fontSize: "15px",
+                  lineHeight: 1.7,
+                  maxWidth: "340px",
+                }}
+              >
+                Votre pharmacie est maintenant active et visible ! Notez votre
+                code de connexion — c'est votre clé d'accès permanente.
+              </p>
+            </div>
+
+            {/* Code card */}
+            <div
+              data-ocid="register.code.card"
+              style={{
+                background: "linear-gradient(135deg, #0a2e17 0%, #082010 100%)",
+                border: "2px solid #00c853",
+                borderRadius: "1rem",
+                padding: "1.75rem 2rem",
+                width: "100%",
+                maxWidth: "340px",
+                boxSizing: "border-box",
+                boxShadow: "0 0 40px rgba(0,200,83,0.2)",
+              }}
+            >
+              <p
+                style={{
+                  color: "#00c853",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.1em",
+                  marginBottom: "0.875rem",
+                }}
+              >
+                🔑 Votre code de connexion
+              </p>
+              <div
+                style={{
+                  fontSize: "3rem",
+                  fontWeight: 900,
+                  color: "#ffffff",
+                  letterSpacing: "0.35em",
+                  fontFamily: "monospace",
+                  lineHeight: 1,
+                  marginBottom: "1rem",
+                  wordBreak: "break-all",
+                }}
+              >
+                {secretCode}
+              </div>
+              <p
+                style={{
+                  color: "#aaaaaa",
+                  fontSize: "13px",
+                  lineHeight: 1.55,
+                  margin: 0,
+                }}
+              >
+                📌 Notez ce code dans un endroit sûr. C'est votre unique clé
+                d'accès permanente à votre espace pharmacien.
+              </p>
+            </div>
+
+            {/* Connectez-vous avec */}
+            <div
+              style={{
+                background: "#141414",
+                border: "1px solid #2a2a2a",
+                borderRadius: "0.75rem",
+                padding: "0.875rem 1.25rem",
+                width: "100%",
+                maxWidth: "340px",
+                boxSizing: "border-box",
+                textAlign: "left",
+              }}
+            >
+              <p
+                style={{
+                  color: "#666666",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  marginBottom: "0.375rem",
+                }}
+              >
+                Connectez-vous avec :
+              </p>
+              <p
+                style={{
+                  color: "#00c853",
+                  fontSize: "15px",
+                  fontFamily: "monospace",
+                  margin: 0,
+                  wordBreak: "break-all",
+                }}
+              >
+                {email.trim()}
+              </p>
+            </div>
+
+            {/* Return home button */}
+            <button
+              type="button"
+              data-ocid="register.back.button"
+              className="pharma-btn-primary"
+              onClick={onBack}
+              style={{
+                width: "100%",
+                maxWidth: "340px",
+                minHeight: "56px",
+                fontSize: "1rem",
+              }}
+            >
+              <BackIcon />
+              Retour à l'accueil
+            </button>
+          </div>
+        )}
       </main>
 
-      {!secretCode && (
+      {step !== 3 && (
         <footer
           style={{
             paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))",
@@ -1067,11 +1282,18 @@ function RegisterScreen({ onBack }: { onBack: () => void }) {
           <button
             type="button"
             className="pharma-btn-secondary"
-            onClick={onBack}
+            onClick={() => {
+              if (step === 2) {
+                setStep(1);
+                setFormError(null);
+              } else {
+                onBack();
+              }
+            }}
             style={{ fontSize: "16px", minHeight: "48px" }}
           >
             <BackIcon />
-            Retour à l'accueil
+            {step === 2 ? "Retour à l'email" : "Retour à l'accueil"}
           </button>
         </footer>
       )}
@@ -1239,37 +1461,70 @@ function PharmacistScreen({
   onBack: () => void;
   onViewPublic: () => void;
 }) {
+  // Step 1: email entry | Step 2: code entry + dashboard
+  const [loginStep, setLoginStep] = useState<1 | 2>(1);
+  const [emailInput, setEmailInput] = useState("");
   const [codeInput, setCodeInput] = useState("");
   const [pharmacy, setPharmacy] = useState<Pharmacy | null>(null);
-  const [notFound, setNotFound] = useState(false);
-  const [hasSearched, setHasSearched] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
 
-  const { mutateAsync: getPharmacyByCode, isPending: isSearching } =
-    useGetPharmacyByCode();
+  const { mutateAsync: getPharmacyByEmail, isPending: isCheckingEmail } =
+    useGetPharmacyByEmail();
+  const { mutateAsync: loginPharmacist, isPending: isLoggingIn } =
+    useLoginPharmacist();
   const { mutateAsync: setOpenStatus, isPending: isTogglingOpen } =
     useSetPharmacyOpenStatus();
 
-  const handleSearch = useCallback(
+  // Step 1: validate email exists
+  const handleEmailContinue = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      const trimmedCode = codeInput.trim();
-      if (!trimmedCode || trimmedCode.length !== 6) return;
-      setNotFound(false);
-      setPharmacy(null);
-      setHasSearched(true);
+      setLoginError(null);
+      const trimmedEmail = emailInput.trim();
+      if (!trimmedEmail) {
+        setLoginError("Veuillez entrer votre adresse email.");
+        return;
+      }
       try {
-        const result = await getPharmacyByCode(trimmedCode);
-        if (result) {
-          setPharmacy(result);
-          setNotFound(false);
-        } else {
-          setNotFound(true);
+        const existing = await getPharmacyByEmail(trimmedEmail);
+        if (!existing) {
+          setLoginError("Aucune pharmacie trouvée avec cet email.");
+          return;
         }
+        setLoginStep(2);
       } catch {
-        setNotFound(true);
+        setLoginError("Une erreur s'est produite. Veuillez réessayer.");
       }
     },
-    [codeInput, getPharmacyByCode],
+    [emailInput, getPharmacyByEmail],
+  );
+
+  // Step 2: login with email + code
+  const handleLogin = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      setLoginError(null);
+      const trimmedCode = codeInput.trim();
+      if (!trimmedCode || trimmedCode.length !== 6) {
+        setLoginError("Veuillez entrer le code à 6 chiffres.");
+        return;
+      }
+      try {
+        const result = await loginPharmacist({
+          email: emailInput.trim(),
+          code: trimmedCode,
+        });
+        if (result) {
+          setPharmacy(result);
+          setLoginError(null);
+        } else {
+          setLoginError("Code incorrect.");
+        }
+      } catch {
+        setLoginError("Une erreur s'est produite. Veuillez réessayer.");
+      }
+    },
+    [emailInput, codeInput, loginPharmacist],
   );
 
   const handleToggleOpen = useCallback(async () => {
@@ -1303,7 +1558,17 @@ function PharmacistScreen({
           gap: "0.75rem",
         }}
       >
-        <BackButton onClick={onBack} />
+        <BackButton
+          onClick={() => {
+            if (loginStep === 2 && !pharmacy) {
+              setLoginStep(1);
+              setCodeInput("");
+              setLoginError(null);
+            } else {
+              onBack();
+            }
+          }}
+        />
         <div>
           <h2
             style={{
@@ -1317,99 +1582,215 @@ function PharmacistScreen({
             Mon espace pharmacie
           </h2>
           <p style={{ color: "#888888", fontSize: "13px", margin: 0 }}>
-            Accès sécurisé par code secret
+            {pharmacy ? "Tableau de bord" : "Accès sécurisé"}
           </p>
         </div>
       </header>
 
       <main style={{ flex: 1 }}>
-        {/* Code entry form */}
-        {!pharmacy && (
-          <form onSubmit={handleSearch} noValidate>
-            <div style={{ marginBottom: "1.25rem" }}>
-              <label
-                htmlFor="pharmacist-code"
+        {/* ── Step 1: Email entry ── */}
+        {!pharmacy && loginStep === 1 && (
+          <form onSubmit={handleEmailContinue} noValidate>
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
+            >
+              <div>
+                <label
+                  htmlFor="pharmacist-email"
+                  style={{
+                    display: "block",
+                    color: "#cccccc",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    marginBottom: "0.5rem",
+                  }}
+                >
+                  Votre adresse Gmail
+                </label>
+                <input
+                  id="pharmacist-email"
+                  data-ocid="pharmacist.email.input"
+                  className="pharma-input"
+                  type="email"
+                  inputMode="email"
+                  value={emailInput}
+                  onChange={(e) => {
+                    setEmailInput(e.target.value);
+                    if (loginError) setLoginError(null);
+                  }}
+                  placeholder="exemple@gmail.com"
+                  autoComplete="email"
+                />
+              </div>
+
+              {loginError && (
+                <div
+                  data-ocid="pharmacist.error_state"
+                  style={{
+                    background: "#2e0a0a",
+                    border: "1px solid #c62828",
+                    borderRadius: "0.75rem",
+                    padding: "1rem 1.25rem",
+                    color: "#ff5252",
+                    fontSize: "15px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.625rem",
+                  }}
+                >
+                  <span style={{ fontSize: "1.25rem", flexShrink: 0 }}>❌</span>
+                  {loginError}
+                </div>
+              )}
+
+              <button
+                data-ocid="pharmacist.email.submit_button"
+                type="submit"
+                className="pharma-btn-primary"
+                disabled={isCheckingEmail}
                 style={{
-                  display: "block",
-                  color: "#cccccc",
-                  fontSize: "14px",
-                  fontWeight: 600,
-                  marginBottom: "0.5rem",
+                  opacity: isCheckingEmail ? 0.7 : 1,
+                  minHeight: "56px",
+                  fontSize: "1rem",
                 }}
               >
-                Code secret à 6 chiffres
-              </label>
-              <input
-                id="pharmacist-code"
-                data-ocid="pharmacist.code.input"
-                className="pharma-input"
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                maxLength={6}
-                value={codeInput}
-                onChange={(e) => {
-                  // Only allow digits
-                  const val = e.target.value.replace(/\D/g, "");
-                  setCodeInput(val);
-                  if (notFound) setNotFound(false);
-                }}
-                placeholder="Ex: 123456"
-                autoComplete="one-time-code"
-                style={{
-                  fontSize: "1.5rem",
-                  letterSpacing: "0.3em",
-                  textAlign: "center",
-                  fontFamily: "monospace",
-                }}
-              />
+                {isCheckingEmail ? (
+                  <>
+                    <BtnSpinner />
+                    Vérification…
+                  </>
+                ) : (
+                  <>➡️ Continuer</>
+                )}
+              </button>
             </div>
-            <button
-              data-ocid="pharmacist.access.submit_button"
-              type="submit"
-              className="pharma-btn-primary"
-              disabled={isSearching || codeInput.trim().length !== 6}
-              style={{
-                opacity: isSearching || codeInput.trim().length !== 6 ? 0.7 : 1,
-                minHeight: "56px",
-                fontSize: "1rem",
-                marginBottom: "1.5rem",
-              }}
-            >
-              {isSearching ? (
-                <>
-                  <BtnSpinner />
-                  Vérification…
-                </>
-              ) : (
-                <>🔓 Accéder à mon espace</>
-              )}
-            </button>
           </form>
         )}
 
-        {/* Not found */}
-        {hasSearched && notFound && (
-          <div
-            data-ocid="pharmacist.error_state"
-            style={{
-              background: "#2e0a0a",
-              border: "1px solid #c62828",
-              borderRadius: "0.75rem",
-              padding: "1rem 1.25rem",
-              color: "#ff5252",
-              fontSize: "15px",
-              display: "flex",
-              alignItems: "center",
-              gap: "0.625rem",
-            }}
-          >
-            <span style={{ fontSize: "1.25rem", flexShrink: 0 }}>❌</span>
-            Code incorrect. Vérifiez votre code secret.
-          </div>
+        {/* ── Step 2: Code entry ── */}
+        {!pharmacy && loginStep === 2 && (
+          <form onSubmit={handleLogin} noValidate>
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
+            >
+              {/* Email display */}
+              <div
+                style={{
+                  background: "#141414",
+                  border: "1px solid #2a2a2a",
+                  borderRadius: "0.75rem",
+                  padding: "0.875rem 1.25rem",
+                }}
+              >
+                <p
+                  style={{
+                    color: "#666666",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                    marginBottom: "0.25rem",
+                  }}
+                >
+                  Email
+                </p>
+                <p
+                  style={{
+                    color: "#cccccc",
+                    fontSize: "15px",
+                    fontFamily: "monospace",
+                    margin: 0,
+                    wordBreak: "break-all",
+                  }}
+                >
+                  {emailInput.trim()}
+                </p>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="pharmacist-code"
+                  style={{
+                    display: "block",
+                    color: "#cccccc",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    marginBottom: "0.5rem",
+                  }}
+                >
+                  Code à 6 chiffres
+                </label>
+                <input
+                  id="pharmacist-code"
+                  data-ocid="pharmacist.code.input"
+                  className="pharma-input"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={6}
+                  value={codeInput}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, "");
+                    setCodeInput(val);
+                    if (loginError) setLoginError(null);
+                  }}
+                  placeholder="123456"
+                  autoComplete="one-time-code"
+                  style={{
+                    fontSize: "1.5rem",
+                    letterSpacing: "0.3em",
+                    textAlign: "center",
+                    fontFamily: "monospace",
+                  }}
+                />
+              </div>
+
+              {loginError && (
+                <div
+                  data-ocid="pharmacist.error_state"
+                  style={{
+                    background: "#2e0a0a",
+                    border: "1px solid #c62828",
+                    borderRadius: "0.75rem",
+                    padding: "1rem 1.25rem",
+                    color: "#ff5252",
+                    fontSize: "15px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.625rem",
+                  }}
+                >
+                  <span style={{ fontSize: "1.25rem", flexShrink: 0 }}>❌</span>
+                  {loginError}
+                </div>
+              )}
+
+              <button
+                data-ocid="pharmacist.access.submit_button"
+                type="submit"
+                className="pharma-btn-primary"
+                disabled={isLoggingIn || codeInput.trim().length !== 6}
+                style={{
+                  opacity:
+                    isLoggingIn || codeInput.trim().length !== 6 ? 0.7 : 1,
+                  minHeight: "56px",
+                  fontSize: "1rem",
+                }}
+              >
+                {isLoggingIn ? (
+                  <>
+                    <BtnSpinner />
+                    Connexion…
+                  </>
+                ) : (
+                  <>🔓 Se connecter</>
+                )}
+              </button>
+            </div>
+          </form>
         )}
 
-        {/* Pharmacist dashboard */}
+        {/* ── Pharmacist dashboard ── */}
         {pharmacy && (
           <div
             data-ocid="pharmacist.dashboard.card"
@@ -1619,11 +2000,21 @@ function PharmacistScreen({
           type="button"
           data-ocid="pharmacist.back.button"
           className="pharma-btn-secondary"
-          onClick={onBack}
+          onClick={() => {
+            if (loginStep === 2 && !pharmacy) {
+              setLoginStep(1);
+              setCodeInput("");
+              setLoginError(null);
+            } else {
+              onBack();
+            }
+          }}
           style={{ fontSize: "16px", minHeight: "48px" }}
         >
           <BackIcon />
-          Retour à l'accueil
+          {loginStep === 2 && !pharmacy
+            ? "Retour à l'email"
+            : "Retour à l'accueil"}
         </button>
       </footer>
     </div>

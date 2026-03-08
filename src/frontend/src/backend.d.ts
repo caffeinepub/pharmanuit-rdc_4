@@ -11,6 +11,10 @@ export interface SubmitResult {
     id: bigint;
     code: string;
 }
+export interface RegisterResult {
+    id: bigint;
+    code: string;
+}
 export interface Pharmacy {
     id: bigint;
     lat: number;
@@ -20,6 +24,7 @@ export interface Pharmacy {
     statut: string;
     ouvert: boolean;
     codeSecret: string;
+    email: string;
     approuve: boolean;
     visible: boolean;
     adresse: string;
@@ -42,9 +47,12 @@ export interface backendInterface {
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
     getPharmacyByCode(code: string): Promise<Pharmacy | null>;
+    getPharmacyByEmail(email: string): Promise<Pharmacy | null>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     initializeSeedData(): Promise<void>;
     isCallerAdmin(): Promise<boolean>;
+    loginPharmacist(email: string, code: string): Promise<Pharmacy | null>;
+    registerPharmacist(email: string, nom: string, tel: string, adresse: string, ouvert: boolean): Promise<RegisterResult>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     setPharmacyOpenStatus(id: bigint, isOpen: boolean): Promise<boolean>;
     submitPharmacy(nom: string, tel: string, adresse: string): Promise<SubmitResult>;

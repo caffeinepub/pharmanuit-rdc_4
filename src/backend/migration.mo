@@ -1,5 +1,6 @@
 import Map "mo:core/Map";
 import Nat "mo:core/Nat";
+import Float "mo:core/Float";
 
 module {
   type OldPharmacy = {
@@ -13,6 +14,7 @@ module {
     approuve : Bool;
     visible : Bool;
     ouvert : Bool;
+    codeSecret : Text;
   };
 
   type OldActor = {
@@ -32,6 +34,7 @@ module {
     visible : Bool;
     ouvert : Bool;
     codeSecret : Text;
+    email : Text;
   };
 
   type NewActor = {
@@ -42,12 +45,9 @@ module {
   public func run(old : OldActor) : NewActor {
     let newPharmacies = old.pharmacies.map<Nat, OldPharmacy, NewPharmacy>(
       func(_id, oldPharmacy) {
-        { oldPharmacy with codeSecret = "0000" };
+        { oldPharmacy with email = "" };
       }
     );
-    {
-      pharmacies = newPharmacies;
-      nextId = old.nextId;
-    };
+    { old with pharmacies = newPharmacies };
   };
 };

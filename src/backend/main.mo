@@ -7,8 +7,8 @@ import Order "mo:core/Order";
 import Principal "mo:core/Principal";
 import Runtime "mo:core/Runtime";
 import MixinAuthorization "authorization/MixinAuthorization";
-import Migration "migration";
 import AccessControl "authorization/access-control";
+import Migration "migration";
 
 (with migration = Migration.run)
 actor {
@@ -38,9 +38,15 @@ actor {
     visible : Bool;
     ouvert : Bool;
     codeSecret : Text;
+    email : Text;
   };
 
   type SubmitResult = {
+    id : Nat;
+    code : Text;
+  };
+
+  type RegisterResult = {
     id : Nat;
     code : Text;
   };
@@ -76,10 +82,10 @@ actor {
     userProfiles.add(caller, profile);
   };
 
-  // PUBLIC: Users can submit pharmacies (requires authentication)
+  // ADMIN ONLY: Backward compatibility (used by seed data)
   public shared ({ caller }) func submitPharmacy(nom : Text, tel : Text, adresse : Text) : async SubmitResult {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only authenticated users can submit pharmacies");
+    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Only admins can submit pharmacies");
     };
 
     if (nom.trim(#char ' ') == "" or tel.trim(#char ' ') == "" or adresse.trim(#char ' ') == "") {
@@ -103,9 +109,59 @@ actor {
       visible = true;
       ouvert = false;
       codeSecret = code;
+      email = ""; // No email for backward compatibility
     };
 
     pharmacies.add(id, pharmacy);
+
+    {
+      id = pharmacy.id;
+      code = pharmacy.codeSecret;
+    };
+  };
+
+  // PUBLIC: No auth required for pharmacist registration
+  public shared ({ caller }) func registerPharmacist(email : Text, nom : Text, tel : Text, adresse : Text, ouvert : Bool) : async RegisterResult {
+    // Validate input
+    if (email.trim(#char ' ') == "") {
+      Runtime.trap("L'email est obligatoire.");
+    };
+
+    // Check for duplicate email
+    let existingPharmacy = pharmacies.values().find(
+      func(pharmacy) { pharmacy.email == email and pharmacy.email != "" }
+    );
+    
+    switch (existingPharmacy) {
+      case (?_) {
+        Runtime.trap("Email déjà enregistré");
+      };
+      case null {
+        // Continue with registration
+      };
+    };
+
+    let id = nextId;
+    nextId += 1;
+    let code = generateUniqueCode(id);
+
+    // Create pharmacy record
+    let pharmacy : Pharmacy = {
+      id;
+      nom;
+      tel;
+      adresse;
+      lat = 0.0;
+      lng = 0.0;
+      statut = "approuve";
+      approuve = true;
+      visible = true;
+      ouvert;
+      codeSecret = code;
+      email;
+    };
+
+    pharmacies.add(pharmacy.id, pharmacy);
 
     {
       id = pharmacy.id;
@@ -166,11 +222,10 @@ actor {
     };
   };
 
-  // ADMIN ONLY: Set open/closed status
+  // Public: Set open/closed status (no auth required per spec, but this is a security risk)
+  // Note: The specification says "no auth needed, any pharmacist can call"
+  // This implementation follows the spec literally, but ideally should verify ownership
   public shared ({ caller }) func setPharmacyOpenStatus(id : Nat, isOpen : Bool) : async Bool {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only admins can set pharmacy open status");
-    };
     switch (pharmacies.get(id)) {
       case (null) { false };
       case (?pharmacy) {
@@ -200,6 +255,7 @@ actor {
         visible = true;
         ouvert = true;
         codeSecret = "112233";
+        email = "";
       },
       {
         id = 2;
@@ -213,6 +269,7 @@ actor {
         visible = true;
         ouvert = true;
         codeSecret = "224455";
+        email = "";
       },
       {
         id = 3;
@@ -226,6 +283,7 @@ actor {
         visible = true;
         ouvert = true;
         codeSecret = "336677";
+        email = "";
       },
       {
         id = 4;
@@ -239,6 +297,7 @@ actor {
         visible = true;
         ouvert = true;
         codeSecret = "448899";
+        email = "";
       },
       {
         id = 5;
@@ -252,6 +311,7 @@ actor {
         visible = true;
         ouvert = true;
         codeSecret = "551122";
+        email = "";
       },
       {
         id = 6;
@@ -265,6 +325,7 @@ actor {
         visible = false;
         ouvert = false;
         codeSecret = "663344";
+        email = "";
       },
       {
         id = 7;
@@ -278,6 +339,7 @@ actor {
         visible = false;
         ouvert = false;
         codeSecret = "775566";
+        email = "";
       },
     ];
 
@@ -285,6 +347,20 @@ actor {
       pharmacies.add(pharmacy.id, pharmacy);
     };
     nextId := 8;
+  };
+
+  // PUBLIC: No auth required
+  public query ({ caller = _ }) func getPharmacyByEmail(email : Text) : async ?Pharmacy {
+    pharmacies.values().find(
+      func(pharmacy) { pharmacy.email == email }
+    );
+  };
+
+  // PUBLIC: No auth required
+  public query ({ caller = _ }) func loginPharmacist(email : Text, code : Text) : async ?Pharmacy {
+    pharmacies.values().find(
+      func(pharmacy) { pharmacy.email == email and pharmacy.codeSecret == code }
+    );
   };
 
   func generateUniqueCode(id : Nat) : Text {
