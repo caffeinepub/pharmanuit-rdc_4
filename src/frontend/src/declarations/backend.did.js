@@ -21,21 +21,27 @@ export const Pharmacy = IDL.Record({
   'tel' : IDL.Text,
   'statut' : IDL.Text,
   'ouvert' : IDL.Bool,
+  'codeSecret' : IDL.Text,
   'approuve' : IDL.Bool,
   'visible' : IDL.Bool,
   'adresse' : IDL.Text,
 });
-export const UserProfile = IDL.Record({ 'name' : IDL.Text });
+export const UserProfile = IDL.Record({
+  'name' : IDL.Text,
+  'email' : IDL.Text,
+  'phone' : IDL.Text,
+});
+export const SubmitResult = IDL.Record({ 'id' : IDL.Nat, 'code' : IDL.Text });
 
 export const idlService = IDL.Service({
   '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
-  'approvePharmacy' : IDL.Func([IDL.Nat], [IDL.Bool], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+  'deletePharmacy' : IDL.Func([IDL.Nat], [IDL.Bool], []),
   'getAllPharmacies' : IDL.Func([], [IDL.Vec(Pharmacy)], ['query']),
   'getApprovedPharmacies' : IDL.Func([], [IDL.Vec(Pharmacy)], ['query']),
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
-  'getPharmacyByName' : IDL.Func([IDL.Text], [IDL.Opt(Pharmacy)], ['query']),
+  'getPharmacyByCode' : IDL.Func([IDL.Text], [IDL.Opt(Pharmacy)], ['query']),
   'getUserProfile' : IDL.Func(
       [IDL.Principal],
       [IDL.Opt(UserProfile)],
@@ -43,11 +49,13 @@ export const idlService = IDL.Service({
     ),
   'initializeSeedData' : IDL.Func([], [], []),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
-  'rejectPharmacy' : IDL.Func([IDL.Nat], [IDL.Bool], []),
-  'revokePharmacy' : IDL.Func([IDL.Nat], [IDL.Bool], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
   'setPharmacyOpenStatus' : IDL.Func([IDL.Nat, IDL.Bool], [IDL.Bool], []),
-  'submitPharmacy' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Nat], []),
+  'submitPharmacy' : IDL.Func(
+      [IDL.Text, IDL.Text, IDL.Text],
+      [SubmitResult],
+      [],
+    ),
   'togglePharmacyVisibility' : IDL.Func([IDL.Nat], [IDL.Bool], []),
 });
 
@@ -67,21 +75,27 @@ export const idlFactory = ({ IDL }) => {
     'tel' : IDL.Text,
     'statut' : IDL.Text,
     'ouvert' : IDL.Bool,
+    'codeSecret' : IDL.Text,
     'approuve' : IDL.Bool,
     'visible' : IDL.Bool,
     'adresse' : IDL.Text,
   });
-  const UserProfile = IDL.Record({ 'name' : IDL.Text });
+  const UserProfile = IDL.Record({
+    'name' : IDL.Text,
+    'email' : IDL.Text,
+    'phone' : IDL.Text,
+  });
+  const SubmitResult = IDL.Record({ 'id' : IDL.Nat, 'code' : IDL.Text });
   
   return IDL.Service({
     '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
-    'approvePharmacy' : IDL.Func([IDL.Nat], [IDL.Bool], []),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+    'deletePharmacy' : IDL.Func([IDL.Nat], [IDL.Bool], []),
     'getAllPharmacies' : IDL.Func([], [IDL.Vec(Pharmacy)], ['query']),
     'getApprovedPharmacies' : IDL.Func([], [IDL.Vec(Pharmacy)], ['query']),
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
-    'getPharmacyByName' : IDL.Func([IDL.Text], [IDL.Opt(Pharmacy)], ['query']),
+    'getPharmacyByCode' : IDL.Func([IDL.Text], [IDL.Opt(Pharmacy)], ['query']),
     'getUserProfile' : IDL.Func(
         [IDL.Principal],
         [IDL.Opt(UserProfile)],
@@ -89,11 +103,13 @@ export const idlFactory = ({ IDL }) => {
       ),
     'initializeSeedData' : IDL.Func([], [], []),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
-    'rejectPharmacy' : IDL.Func([IDL.Nat], [IDL.Bool], []),
-    'revokePharmacy' : IDL.Func([IDL.Nat], [IDL.Bool], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
     'setPharmacyOpenStatus' : IDL.Func([IDL.Nat, IDL.Bool], [IDL.Bool], []),
-    'submitPharmacy' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Nat], []),
+    'submitPharmacy' : IDL.Func(
+        [IDL.Text, IDL.Text, IDL.Text],
+        [SubmitResult],
+        [],
+      ),
     'togglePharmacyVisibility' : IDL.Func([IDL.Nat], [IDL.Bool], []),
   });
 };

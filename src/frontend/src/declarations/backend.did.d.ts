@@ -18,31 +18,35 @@ export interface Pharmacy {
   'tel' : string,
   'statut' : string,
   'ouvert' : boolean,
+  'codeSecret' : string,
   'approuve' : boolean,
   'visible' : boolean,
   'adresse' : string,
 }
-export interface UserProfile { 'name' : string }
+export interface SubmitResult { 'id' : bigint, 'code' : string }
+export interface UserProfile {
+  'name' : string,
+  'email' : string,
+  'phone' : string,
+}
 export type UserRole = { 'admin' : null } |
   { 'user' : null } |
   { 'guest' : null };
 export interface _SERVICE {
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
-  'approvePharmacy' : ActorMethod<[bigint], boolean>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
+  'deletePharmacy' : ActorMethod<[bigint], boolean>,
   'getAllPharmacies' : ActorMethod<[], Array<Pharmacy>>,
   'getApprovedPharmacies' : ActorMethod<[], Array<Pharmacy>>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
-  'getPharmacyByName' : ActorMethod<[string], [] | [Pharmacy]>,
+  'getPharmacyByCode' : ActorMethod<[string], [] | [Pharmacy]>,
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
   'initializeSeedData' : ActorMethod<[], undefined>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
-  'rejectPharmacy' : ActorMethod<[bigint], boolean>,
-  'revokePharmacy' : ActorMethod<[bigint], boolean>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'setPharmacyOpenStatus' : ActorMethod<[bigint, boolean], boolean>,
-  'submitPharmacy' : ActorMethod<[string, string, string], bigint>,
+  'submitPharmacy' : ActorMethod<[string, string, string], SubmitResult>,
   'togglePharmacyVisibility' : ActorMethod<[bigint], boolean>,
 }
 export declare const idlService: IDL.ServiceClass;

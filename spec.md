@@ -1,31 +1,50 @@
 # PharmaNuit RDC
 
 ## Current State
-Application de gestion de pharmacies de nuit en RDC. Le backend Motoko gère les pharmacies avec des statuts (en_attente, approuve, rejete). L'accès admin dans le frontend est sécurisé par un mot de passe local (sessionStorage). Le backend utilise un système AccessControl ICP pour vérifier les permissions sur les fonctions admin.
 
-## Problème identifié
-Les fonctions `approvePharmacy`, `rejectPharmacy`, `revokePharmacy`, `togglePharmacyVisibility` exigent `AccessControl.hasPermission(accessControlState, caller, #admin)`. Or, l'administrateur se connecte uniquement via un mot de passe local dans le frontend -- il n'est pas enregistré comme admin ICP dans le canister. Résultat : tous les appels admin échouent silencieusement (Runtime.trap).
-
-De même, `setPharmacyOpenStatus` exige `#user` auth ICP, ce qui empêche les pharmaciens anonymes de mettre à jour leur statut.
+- Backend Motoko avec pharmacies stockées, statuts en_attente/approuve/rejete
+- Frontend React avec écrans: home, nearby, register, admin, pharmacien, list
+- Enregistrement pharmacie -> poll toutes 5s -> redirection si approuvé par admin
+- Admin accède via 5 taps sur le logo + mot de passe
+- Espace pharmacien accès via 3 taps coin bas-droite, puis recherche par nom
+- Admin peut approuver, rejeter, révoquer, toggler visibilité
 
 ## Requested Changes (Diff)
 
 ### Add
-- Rien à ajouter
+- Champ `codeSecret` (Text) dans le type Pharmacy du backend
+- Fonction `submitPharmacy` retourne maintenant un Record `{ id: Nat, code: Text }` au lieu de juste `Nat` — le code à 6 chiffres est généré aléatoirement au moment de l'inscription
+- Nouvelle fonction backend `getPharmacyByCode(code: Text) : async ?Pharmacy` — permet au pharmacien de retrouver sa pharmacie par son code secret
+- Toutes les pharmacies s'enregistrent automatiquement comme "approuve" et visible = true dès soumission (plus de validation admin nécessaire)
+- Dans l'admin: remplacer les boutons Approuver/Rejeter par un seul bouton "Supprimer définitivement" (deletePharmacy)
+- Nouvelle fonction backend `deletePharmacy(id: Nat) : async Bool`
+- Écran RegisterScreen: après soumission, afficher le code secret à 6 chiffres avec message de félicitations — l'utilisateur doit noter ce code
+- Écran PharmacistScreen: remplacer la recherche par nom par une saisie de code secret à 6 chiffres — si le code correspond, ouvre le dashboard de la pharmacie
+- Le geste secret (3 taps coin bas-droite) mène maintenant vers un écran de saisie de code (pas plus de recherche par nom)
 
 ### Modify
-- `approvePharmacy` : supprimer la vérification AccessControl admin, garder la logique de mise à jour
-- `rejectPharmacy` : supprimer la vérification AccessControl admin
-- `revokePharmacy` : supprimer la vérification AccessControl admin
-- `togglePharmacyVisibility` : supprimer la vérification AccessControl admin
-- `setPharmacyOpenStatus` : supprimer la vérification AccessControl user (accès libre pour permettre aux pharmaciens anonymes de gérer leur statut)
-- `initializeSeedData` : supprimer la vérification AccessControl admin
+- `submitPharmacy` backend: génère un code aléatoire à 6 chiffres, marque directement approuve=true, visible=true, statut="approuve", retourne `{ id; code }`
+- Admin onglet "En attente" → remplacé par onglet "Toutes les pharmacies" avec bouton supprimer sur chaque entrée
+- Admin onglet "Approuvées" → garde toggle visibilité, remplace "Révoquer" par "Supprimer"
+- Statistiques admin: retirer compteur "en attente", ajouter compteur "supprimées" si utile
+- RegisterScreen: afficher code après soumission, pas de polling (plus besoin puisque auto-approuvé)
+- PharmacistScreen: saisie de code à la place de la recherche par nom
 
 ### Remove
-- Les imports/usages AccessControl non nécessaires si plus aucune fonction les utilise
+- `approvePharmacy`, `rejectPharmacy`, `revokePharmacy` du backend (non nécessaires)
+- Le polling toutes les 5 secondes dans RegisterScreen (plus besoin)
+- La logique de redirection automatique après approbation admin
+- `getPharmacyByName` (remplacé par `getPharmacyByCode`)
+- L'onglet "En attente" dans l'admin (plus de validation)
 
 ## Implementation Plan
-1. Régénérer le backend Motoko avec toutes les mêmes fonctions mais sans les vérifications AccessControl sur les fonctions admin/pharmacien
-2. Conserver exactement le même modèle de données Pharmacy (id, nom, tel, adresse, lat, lng, statut, approuve, visible, ouvert)
-3. Conserver les seeds data identiques (IDs 1-7)
-4. nextId commence à 8
+
+1. **Backend**: Ajouter `codeSecret` au type Pharmacy. Modifier `submitPharmacy` pour générer code 6 chiffres aléatoire, auto-approuver, retourner `{ id; code }`. Ajouter `getPharmacyByCode`. Ajouter `deletePharmacy`. Supprimer `approvePharmacy`, `rejectPharmacy`, `revokePharmacy`, `getPharmacyByName`.
+
+2. **Frontend RegisterScreen**: Après soumission, afficher le code à 6 chiffres reçu du backend dans un grand encadré bien visible avec message "Notez ce code, c'est votre clé d'accès". Supprimer le polling.
+
+3. **Frontend PharmacistScreen**: Remplacer la recherche par nom par une saisie de code à 6 chiffres. Si code valide -> dashboard pharmacie. Si code invalide -> message d'erreur.
+
+4. **Frontend AdminScreen**: Supprimer onglet "En attente". Modifier onglet "Approuvées" → "Pharmacies" avec liste de toutes les pharmacies, bouton "Supprimer" sur chaque carte. Mettre à jour statistiques.
+
+5. **Frontend hooks**: Mettre à jour les hooks pour correspondre aux nouvelles fonctions backend (submitPharmacy retourne Record, nouveaux/supprimés hooks).

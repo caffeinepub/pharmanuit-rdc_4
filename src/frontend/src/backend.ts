@@ -89,6 +89,10 @@ export class ExternalBlob {
         return this;
     }
 }
+export interface SubmitResult {
+    id: bigint;
+    code: string;
+}
 export interface Pharmacy {
     id: bigint;
     lat: number;
@@ -97,12 +101,15 @@ export interface Pharmacy {
     tel: string;
     statut: string;
     ouvert: boolean;
+    codeSecret: string;
     approuve: boolean;
     visible: boolean;
     adresse: string;
 }
 export interface UserProfile {
     name: string;
+    email: string;
+    phone: string;
 }
 export enum UserRole {
     admin = "admin",
@@ -111,21 +118,19 @@ export enum UserRole {
 }
 export interface backendInterface {
     _initializeAccessControlWithSecret(userSecret: string): Promise<void>;
-    approvePharmacy(id: bigint): Promise<boolean>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
+    deletePharmacy(id: bigint): Promise<boolean>;
     getAllPharmacies(): Promise<Array<Pharmacy>>;
     getApprovedPharmacies(): Promise<Array<Pharmacy>>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
-    getPharmacyByName(nom: string): Promise<Pharmacy | null>;
+    getPharmacyByCode(code: string): Promise<Pharmacy | null>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     initializeSeedData(): Promise<void>;
     isCallerAdmin(): Promise<boolean>;
-    rejectPharmacy(id: bigint): Promise<boolean>;
-    revokePharmacy(id: bigint): Promise<boolean>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     setPharmacyOpenStatus(id: bigint, isOpen: boolean): Promise<boolean>;
-    submitPharmacy(nom: string, tel: string, adresse: string): Promise<bigint>;
+    submitPharmacy(nom: string, tel: string, adresse: string): Promise<SubmitResult>;
     togglePharmacyVisibility(id: bigint): Promise<boolean>;
 }
 import type { Pharmacy as _Pharmacy, UserProfile as _UserProfile, UserRole as _UserRole } from "./declarations/backend.did.d.ts";
@@ -145,20 +150,6 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async approvePharmacy(arg0: bigint): Promise<boolean> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.approvePharmacy(arg0);
-                return result;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.approvePharmacy(arg0);
-            return result;
-        }
-    }
     async assignCallerUserRole(arg0: Principal, arg1: UserRole): Promise<void> {
         if (this.processError) {
             try {
@@ -170,6 +161,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.assignCallerUserRole(arg0, to_candid_UserRole_n1(this._uploadFile, this._downloadFile, arg1));
+            return result;
+        }
+    }
+    async deletePharmacy(arg0: bigint): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.deletePharmacy(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.deletePharmacy(arg0);
             return result;
         }
     }
@@ -229,17 +234,17 @@ export class Backend implements backendInterface {
             return from_candid_UserRole_n4(this._uploadFile, this._downloadFile, result);
         }
     }
-    async getPharmacyByName(arg0: string): Promise<Pharmacy | null> {
+    async getPharmacyByCode(arg0: string): Promise<Pharmacy | null> {
         if (this.processError) {
             try {
-                const result = await this.actor.getPharmacyByName(arg0);
+                const result = await this.actor.getPharmacyByCode(arg0);
                 return from_candid_opt_n6(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.getPharmacyByName(arg0);
+            const result = await this.actor.getPharmacyByCode(arg0);
             return from_candid_opt_n6(this._uploadFile, this._downloadFile, result);
         }
     }
@@ -285,34 +290,6 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async rejectPharmacy(arg0: bigint): Promise<boolean> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.rejectPharmacy(arg0);
-                return result;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.rejectPharmacy(arg0);
-            return result;
-        }
-    }
-    async revokePharmacy(arg0: bigint): Promise<boolean> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.revokePharmacy(arg0);
-                return result;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.revokePharmacy(arg0);
-            return result;
-        }
-    }
     async saveCallerUserProfile(arg0: UserProfile): Promise<void> {
         if (this.processError) {
             try {
@@ -341,7 +318,7 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async submitPharmacy(arg0: string, arg1: string, arg2: string): Promise<bigint> {
+    async submitPharmacy(arg0: string, arg1: string, arg2: string): Promise<SubmitResult> {
         if (this.processError) {
             try {
                 const result = await this.actor.submitPharmacy(arg0, arg1, arg2);

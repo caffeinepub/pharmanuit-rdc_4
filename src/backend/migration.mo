@@ -11,10 +11,13 @@ module {
     lng : Float;
     statut : Text;
     approuve : Bool;
+    visible : Bool;
+    ouvert : Bool;
   };
 
   type OldActor = {
     pharmacies : Map.Map<Nat, OldPharmacy>;
+    nextId : Nat;
   };
 
   type NewPharmacy = {
@@ -27,18 +30,24 @@ module {
     statut : Text;
     approuve : Bool;
     visible : Bool;
+    ouvert : Bool;
+    codeSecret : Text;
   };
 
   type NewActor = {
     pharmacies : Map.Map<Nat, NewPharmacy>;
+    nextId : Nat;
   };
 
   public func run(old : OldActor) : NewActor {
     let newPharmacies = old.pharmacies.map<Nat, OldPharmacy, NewPharmacy>(
       func(_id, oldPharmacy) {
-        { oldPharmacy with visible = false };
+        { oldPharmacy with codeSecret = "0000" };
       }
     );
-    { pharmacies = newPharmacies };
+    {
+      pharmacies = newPharmacies;
+      nextId = old.nextId;
+    };
   };
 };

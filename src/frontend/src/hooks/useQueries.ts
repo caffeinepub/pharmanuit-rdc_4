@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Pharmacy } from "../backend.d";
+import type { Pharmacy, SubmitResult } from "../backend.d";
 import { useActor } from "./useActor";
 
 export function useApprovedPharmacies() {
@@ -23,7 +23,7 @@ export function useAllPharmacies() {
       return actor.getAllPharmacies();
     },
     enabled: !!actor && !isFetching,
-    refetchInterval: 10000, // Rafraîchissement automatique toutes les 10 secondes
+    refetchInterval: 10000,
   });
 }
 
@@ -42,31 +42,43 @@ export function useIsCallerAdmin() {
 export function useSubmitPharmacy() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async ({
-      nom,
-      tel,
-      adresse,
-    }: {
-      nom: string;
-      tel: string;
-      adresse: string;
-    }) => {
+  return useMutation<
+    SubmitResult,
+    Error,
+    { nom: string; tel: string; adresse: string }
+  >({
+    mutationFn: async ({ nom, tel, adresse }) => {
       if (!actor) throw new Error("Actor not available");
       return actor.submitPharmacy(nom, tel, adresse);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["allPharmacies"] });
+      queryClient.invalidateQueries({ queryKey: ["approvedPharmacies"] });
     },
   });
 }
 
-export function useGetPharmacyByName() {
+export function useGetPharmacyByCode() {
   const { actor } = useActor();
-  return useMutation({
-    mutationFn: async (nom: string) => {
+  return useMutation<Pharmacy | null, Error, string>({
+    mutationFn: async (code: string) => {
       if (!actor) throw new Error("Actor not available");
-      return actor.getPharmacyByName(nom);
+      return actor.getPharmacyByCode(code);
+    },
+  });
+}
+
+export function useDeletePharmacy() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation<boolean, Error, bigint>({
+    mutationFn: async (id: bigint) => {
+      if (!actor) throw new Error("Actor not available");
+      return actor.deletePharmacy(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["allPharmacies"] });
+      queryClient.invalidateQueries({ queryKey: ["approvedPharmacies"] });
     },
   });
 }
@@ -74,54 +86,10 @@ export function useGetPharmacyByName() {
 export function useSetPharmacyOpenStatus() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ id, isOpen }: { id: bigint; isOpen: boolean }) => {
+  return useMutation<boolean, Error, { id: bigint; isOpen: boolean }>({
+    mutationFn: async ({ id, isOpen }) => {
       if (!actor) throw new Error("Actor not available");
       return actor.setPharmacyOpenStatus(id, isOpen);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["allPharmacies"] });
-      queryClient.invalidateQueries({ queryKey: ["approvedPharmacies"] });
-    },
-  });
-}
-
-export function useApprovePharmacy() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: bigint) => {
-      if (!actor) throw new Error("Actor not available");
-      return actor.approvePharmacy(id);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["allPharmacies"] });
-      queryClient.invalidateQueries({ queryKey: ["approvedPharmacies"] });
-    },
-  });
-}
-
-export function useRejectPharmacy() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: bigint) => {
-      if (!actor) throw new Error("Actor not available");
-      return actor.rejectPharmacy(id);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["allPharmacies"] });
-    },
-  });
-}
-
-export function useRevokePharmacy() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: bigint) => {
-      if (!actor) throw new Error("Actor not available");
-      return actor.revokePharmacy(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["allPharmacies"] });
@@ -133,7 +101,7 @@ export function useRevokePharmacy() {
 export function useTogglePharmacyVisibility() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
-  return useMutation({
+  return useMutation<boolean, Error, bigint>({
     mutationFn: async (id: bigint) => {
       if (!actor) throw new Error("Actor not available");
       return actor.togglePharmacyVisibility(id);
@@ -148,7 +116,7 @@ export function useTogglePharmacyVisibility() {
 export function useInitializeSeedData() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
-  return useMutation({
+  return useMutation<void, Error, void>({
     mutationFn: async () => {
       if (!actor) throw new Error("Actor not available");
       return actor.initializeSeedData();

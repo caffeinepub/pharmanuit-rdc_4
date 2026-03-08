@@ -7,6 +7,10 @@ export interface None {
     __kind__: "None";
 }
 export type Option<T> = Some<T> | None;
+export interface SubmitResult {
+    id: bigint;
+    code: string;
+}
 export interface Pharmacy {
     id: bigint;
     lat: number;
@@ -15,12 +19,15 @@ export interface Pharmacy {
     tel: string;
     statut: string;
     ouvert: boolean;
+    codeSecret: string;
     approuve: boolean;
     visible: boolean;
     adresse: string;
 }
 export interface UserProfile {
     name: string;
+    email: string;
+    phone: string;
 }
 export enum UserRole {
     admin = "admin",
@@ -28,20 +35,18 @@ export enum UserRole {
     guest = "guest"
 }
 export interface backendInterface {
-    approvePharmacy(id: bigint): Promise<boolean>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
+    deletePharmacy(id: bigint): Promise<boolean>;
     getAllPharmacies(): Promise<Array<Pharmacy>>;
     getApprovedPharmacies(): Promise<Array<Pharmacy>>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
-    getPharmacyByName(nom: string): Promise<Pharmacy | null>;
+    getPharmacyByCode(code: string): Promise<Pharmacy | null>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     initializeSeedData(): Promise<void>;
     isCallerAdmin(): Promise<boolean>;
-    rejectPharmacy(id: bigint): Promise<boolean>;
-    revokePharmacy(id: bigint): Promise<boolean>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     setPharmacyOpenStatus(id: bigint, isOpen: boolean): Promise<boolean>;
-    submitPharmacy(nom: string, tel: string, adresse: string): Promise<bigint>;
+    submitPharmacy(nom: string, tel: string, adresse: string): Promise<SubmitResult>;
     togglePharmacyVisibility(id: bigint): Promise<boolean>;
 }
