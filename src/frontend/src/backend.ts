@@ -96,6 +96,7 @@ export interface Pharmacy {
     nom: string;
     tel: string;
     statut: string;
+    ouvert: boolean;
     approuve: boolean;
     visible: boolean;
     adresse: string;
@@ -116,16 +117,18 @@ export interface backendInterface {
     getApprovedPharmacies(): Promise<Array<Pharmacy>>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
+    getPharmacyByName(nom: string): Promise<Pharmacy | null>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     initializeSeedData(): Promise<void>;
     isCallerAdmin(): Promise<boolean>;
     rejectPharmacy(id: bigint): Promise<boolean>;
     revokePharmacy(id: bigint): Promise<boolean>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
-    submitPharmacy(nom: string, tel: string, adresse: string, lat: number, lng: number): Promise<bigint>;
+    setPharmacyOpenStatus(id: bigint, isOpen: boolean): Promise<boolean>;
+    submitPharmacy(nom: string, tel: string, adresse: string): Promise<bigint>;
     togglePharmacyVisibility(id: bigint): Promise<boolean>;
 }
-import type { UserProfile as _UserProfile, UserRole as _UserRole } from "./declarations/backend.did.d.ts";
+import type { Pharmacy as _Pharmacy, UserProfile as _UserProfile, UserRole as _UserRole } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
     constructor(private actor: ActorSubclass<_SERVICE>, private _uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, private _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, private processError?: (error: unknown) => never){}
     async _initializeAccessControlWithSecret(arg0: string): Promise<void> {
@@ -226,6 +229,20 @@ export class Backend implements backendInterface {
             return from_candid_UserRole_n4(this._uploadFile, this._downloadFile, result);
         }
     }
+    async getPharmacyByName(arg0: string): Promise<Pharmacy | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getPharmacyByName(arg0);
+                return from_candid_opt_n6(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getPharmacyByName(arg0);
+            return from_candid_opt_n6(this._uploadFile, this._downloadFile, result);
+        }
+    }
     async getUserProfile(arg0: Principal): Promise<UserProfile | null> {
         if (this.processError) {
             try {
@@ -310,17 +327,31 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async submitPharmacy(arg0: string, arg1: string, arg2: string, arg3: number, arg4: number): Promise<bigint> {
+    async setPharmacyOpenStatus(arg0: bigint, arg1: boolean): Promise<boolean> {
         if (this.processError) {
             try {
-                const result = await this.actor.submitPharmacy(arg0, arg1, arg2, arg3, arg4);
+                const result = await this.actor.setPharmacyOpenStatus(arg0, arg1);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.submitPharmacy(arg0, arg1, arg2, arg3, arg4);
+            const result = await this.actor.setPharmacyOpenStatus(arg0, arg1);
+            return result;
+        }
+    }
+    async submitPharmacy(arg0: string, arg1: string, arg2: string): Promise<bigint> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.submitPharmacy(arg0, arg1, arg2);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.submitPharmacy(arg0, arg1, arg2);
             return result;
         }
     }
@@ -343,6 +374,9 @@ function from_candid_UserRole_n4(_uploadFile: (file: ExternalBlob) => Promise<Ui
     return from_candid_variant_n5(_uploadFile, _downloadFile, value);
 }
 function from_candid_opt_n3(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_UserProfile]): UserProfile | null {
+    return value.length === 0 ? null : value[0];
+}
+function from_candid_opt_n6(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_Pharmacy]): Pharmacy | null {
     return value.length === 0 ? null : value[0];
 }
 function from_candid_variant_n5(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {

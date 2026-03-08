@@ -4,15 +4,17 @@ import {
   useAllPharmacies,
   useApprovePharmacy,
   useApprovedPharmacies,
+  useGetPharmacyByName,
   useInitializeSeedData,
   useRejectPharmacy,
   useRevokePharmacy,
+  useSetPharmacyOpenStatus,
   useSubmitPharmacy,
   useTogglePharmacyVisibility,
 } from "./hooks/useQueries";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-type Screen = "home" | "nearby" | "register" | "admin";
+type Screen = "home" | "nearby" | "register" | "admin" | "pharmacien";
 
 // ─── Haversine distance (km) ─────────────────────────────────────────────────
 function haversine(
@@ -165,6 +167,10 @@ function BackButton({ onClick }: { onClick: () => void }) {
 function HomeScreen({ onNavigate }: { onNavigate: (s: Screen) => void }) {
   const tapCountRef = useRef(0);
   const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pharmacistTapCountRef = useRef(0);
+  const pharmacistTapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
   const handleLogoCoffeeTap = useCallback(
     (e?: React.MouseEvent | React.KeyboardEvent) => {
@@ -191,6 +197,25 @@ function HomeScreen({ onNavigate }: { onNavigate: (s: Screen) => void }) {
     },
     [onNavigate],
   );
+
+  // Secret tap on "Inscrire ma pharmacie" button to open pharmacist space
+  const handleRegisterSecretTap = useCallback(() => {
+    pharmacistTapCountRef.current += 1;
+
+    if (pharmacistTapTimerRef.current) {
+      clearTimeout(pharmacistTapTimerRef.current);
+    }
+
+    if (pharmacistTapCountRef.current >= 3) {
+      pharmacistTapCountRef.current = 0;
+      onNavigate("pharmacien");
+      return;
+    }
+
+    pharmacistTapTimerRef.current = setTimeout(() => {
+      pharmacistTapCountRef.current = 0;
+    }, 2000);
+  }, [onNavigate]);
 
   return (
     <div
@@ -298,6 +323,28 @@ function HomeScreen({ onNavigate }: { onNavigate: (s: Screen) => void }) {
           Inscrire ma pharmacie
         </button>
       </main>
+
+      {/* Invisible secret tap zone for pharmacist access (bottom right) */}
+      <button
+        type="button"
+        onClick={handleRegisterSecretTap}
+        tabIndex={-1}
+        aria-hidden="true"
+        style={{
+          position: "fixed",
+          bottom: 0,
+          right: 0,
+          width: 60,
+          height: 60,
+          zIndex: 9999,
+          background: "transparent",
+          border: "none",
+          cursor: "default",
+          WebkitTapHighlightColor: "transparent",
+          outline: "none",
+          padding: 0,
+        }}
+      />
 
       {/* Info block */}
       <div
@@ -633,8 +680,6 @@ function RegisterScreen({ onBack }: { onBack: () => void }) {
   const [nom, setNom] = useState("");
   const [tel, setTel] = useState("");
   const [adresse, setAdresse] = useState("");
-  const [lat, setLat] = useState("");
-  const [lng, setLng] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const { mutateAsync: submitPharmacy, isPending } = useSubmitPharmacy();
@@ -649,28 +694,21 @@ function RegisterScreen({ onBack }: { onBack: () => void }) {
         return;
       }
 
-      const latNum = lat ? Number.parseFloat(lat) : 0;
-      const lngNum = lng ? Number.parseFloat(lng) : 0;
-
       try {
         await submitPharmacy({
           nom: nom.trim(),
           tel: tel.trim(),
           adresse: adresse.trim(),
-          lat: latNum,
-          lng: lngNum,
         });
         setSubmitted(true);
         setNom("");
         setTel("");
         setAdresse("");
-        setLat("");
-        setLng("");
       } catch {
         setFormError("Une erreur s'est produite. Veuillez réessayer.");
       }
     },
-    [nom, tel, adresse, lat, lng, submitPharmacy],
+    [nom, tel, adresse, submitPharmacy],
   );
 
   return (
@@ -715,31 +753,102 @@ function RegisterScreen({ onBack }: { onBack: () => void }) {
         {submitted ? (
           <div
             data-ocid="register.success_state"
-            className="pharma-card"
-            style={{ padding: "2rem", textAlign: "center", marginTop: "1rem" }}
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              textAlign: "center",
+              paddingTop: "2rem",
+              gap: "1.25rem",
+            }}
           >
-            <div style={{ fontSize: "3.5rem", marginBottom: "1rem" }}>✅</div>
-            <h3
+            {/* Waiting icon */}
+            <div
               style={{
-                fontSize: "1.25rem",
-                fontWeight: 700,
-                color: "#00c853",
-                marginBottom: "0.75rem",
+                background: "radial-gradient(circle, #2e1a00 0%, #1a0e00 100%)",
+                borderRadius: "50%",
+                width: 96,
+                height: 96,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                border: "2px solid #ffb30055",
+                boxShadow: "0 0 30px rgba(255,179,0,0.15)",
+                flexShrink: 0,
               }}
             >
-              Soumission réussie !
-            </h3>
-            <p style={{ color: "#cccccc", fontSize: "16px", lineHeight: 1.6 }}>
-              Votre pharmacie a été soumise pour approbation. Vous serez
-              contacté une fois la vérification effectuée.
-            </p>
+              <span style={{ fontSize: "3rem" }}>⏳</span>
+            </div>
+
+            <div>
+              <h3
+                style={{
+                  fontSize: "1.375rem",
+                  fontWeight: 800,
+                  color: "#ffb300",
+                  marginBottom: "0.75rem",
+                  lineHeight: 1.2,
+                }}
+              >
+                Demande envoyée
+              </h3>
+              <p
+                style={{
+                  color: "#cccccc",
+                  fontSize: "16px",
+                  lineHeight: 1.7,
+                  maxWidth: "340px",
+                }}
+              >
+                Votre pharmacie a été soumise. Vous n'êtes pas encore enregistré
+                dans le système. L'administrateur va vérifier votre dossier.
+                Vous serez approuvé prochainement.
+              </p>
+            </div>
+
+            {/* Status badge */}
+            <div
+              style={{
+                background: "#2e1a00",
+                border: "1px solid #ffb30055",
+                borderRadius: "9999px",
+                padding: "0.5rem 1.25rem",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem",
+              }}
+            >
+              <span
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  background: "#ffb300",
+                  display: "inline-block",
+                  animation: "pulseDot 1.5s ease-in-out infinite",
+                }}
+              />
+              <span
+                style={{ color: "#ffb300", fontSize: "14px", fontWeight: 600 }}
+              >
+                En attente d'approbation
+              </span>
+            </div>
+
             <button
               type="button"
-              className="pharma-btn-primary"
-              onClick={() => setSubmitted(false)}
-              style={{ marginTop: "1.5rem" }}
+              data-ocid="register.back.button"
+              className="pharma-btn-secondary"
+              onClick={onBack}
+              style={{
+                marginTop: "0.5rem",
+                minHeight: "56px",
+                fontSize: "1rem",
+                width: "100%",
+              }}
             >
-              Soumettre une autre
+              <BackIcon />
+              Retour à l'accueil
             </button>
           </div>
         ) : (
@@ -832,64 +941,6 @@ function RegisterScreen({ onBack }: { onBack: () => void }) {
                 />
               </div>
 
-              {/* Coordinates */}
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: "0.75rem",
-                }}
-              >
-                <div>
-                  <label
-                    htmlFor="reg-lat"
-                    style={{
-                      display: "block",
-                      color: "#cccccc",
-                      fontSize: "14px",
-                      fontWeight: 600,
-                      marginBottom: "0.5rem",
-                    }}
-                  >
-                    Latitude
-                  </label>
-                  <input
-                    id="reg-lat"
-                    data-ocid="register.lat.input"
-                    className="pharma-input"
-                    type="number"
-                    step="any"
-                    value={lat}
-                    onChange={(e) => setLat(e.target.value)}
-                    placeholder="-4.3217"
-                  />
-                </div>
-                <div>
-                  <label
-                    htmlFor="reg-lng"
-                    style={{
-                      display: "block",
-                      color: "#cccccc",
-                      fontSize: "14px",
-                      fontWeight: 600,
-                      marginBottom: "0.5rem",
-                    }}
-                  >
-                    Longitude
-                  </label>
-                  <input
-                    id="reg-lng"
-                    data-ocid="register.lng.input"
-                    className="pharma-input"
-                    type="number"
-                    step="any"
-                    value={lng}
-                    onChange={(e) => setLng(e.target.value)}
-                    placeholder="15.3222"
-                  />
-                </div>
-              </div>
-
               {formError && (
                 <div
                   data-ocid="register.error_state"
@@ -908,30 +959,6 @@ function RegisterScreen({ onBack }: { onBack: () => void }) {
                   ❌ {formError}
                 </div>
               )}
-
-              <div
-                className="pharma-card"
-                style={{
-                  padding: "0.875rem",
-                  display: "flex",
-                  gap: "0.5rem",
-                  alignItems: "flex-start",
-                }}
-              >
-                <span style={{ flexShrink: 0, marginTop: "2px" }}>ℹ️</span>
-                <p
-                  style={{
-                    color: "#888888",
-                    fontSize: "13px",
-                    margin: 0,
-                    lineHeight: 1.5,
-                  }}
-                >
-                  Les coordonnées GPS permettent aux utilisateurs de trouver
-                  votre pharmacie via Google Maps. Utilisez Google Maps pour
-                  obtenir vos coordonnées exactes.
-                </p>
-              </div>
 
               <button
                 data-ocid="register.submit.submit_button"
@@ -984,14 +1011,36 @@ function PendingPharmacyCard({
   index,
   onApprove,
   onReject,
-  isAnyPending,
 }: {
   pharmacy: Pharmacy;
   index: number;
-  onApprove: (id: bigint) => void;
-  onReject: (id: bigint) => void;
-  isAnyPending: boolean;
+  onApprove: (id: bigint) => Promise<void>;
+  onReject: (id: bigint) => Promise<void>;
 }) {
+  const [isApproving, setIsApproving] = useState(false);
+  const [isRejecting, setIsRejecting] = useState(false);
+  const isBusy = isApproving || isRejecting;
+
+  const handleApprove = async () => {
+    if (isBusy) return;
+    setIsApproving(true);
+    try {
+      await onApprove(pharmacy.id);
+    } finally {
+      setIsApproving(false);
+    }
+  };
+
+  const handleReject = async () => {
+    if (isBusy) return;
+    setIsRejecting(true);
+    try {
+      await onReject(pharmacy.id);
+    } finally {
+      setIsRejecting(false);
+    }
+  };
+
   return (
     <div
       data-ocid={`admin.pending.item.${index}`}
@@ -1027,29 +1076,43 @@ function PendingPharmacyCard({
           type="button"
           data-ocid={`admin.approve.button.${index}`}
           className="pharma-btn-success"
-          onClick={() => onApprove(pharmacy.id)}
-          disabled={isAnyPending}
+          onClick={handleApprove}
+          disabled={isBusy}
           style={{
-            opacity: isAnyPending ? 0.6 : 1,
+            opacity: isBusy ? 0.6 : 1,
             minHeight: 44,
             fontSize: "14px",
           }}
         >
-          ✅ Approuver
+          {isApproving ? (
+            <>
+              <BtnSpinner />
+              En cours…
+            </>
+          ) : (
+            <>✅ Approuver</>
+          )}
         </button>
         <button
           type="button"
           data-ocid={`admin.reject.button.${index}`}
           className="pharma-btn-danger"
-          onClick={() => onReject(pharmacy.id)}
-          disabled={isAnyPending}
+          onClick={handleReject}
+          disabled={isBusy}
           style={{
-            opacity: isAnyPending ? 0.6 : 1,
+            opacity: isBusy ? 0.6 : 1,
             minHeight: 44,
             fontSize: "14px",
           }}
         >
-          ❌ Rejeter
+          {isRejecting ? (
+            <>
+              <BtnSpinner />
+              En cours…
+            </>
+          ) : (
+            <>❌ Rejeter</>
+          )}
         </button>
       </div>
     </div>
@@ -1062,16 +1125,36 @@ function ApprovedPharmacyCard({
   index,
   onRevoke,
   onToggleVisibility,
-  isAnyPending,
-  isTogglingVisibility,
 }: {
   pharmacy: Pharmacy;
   index: number;
-  onRevoke: (id: bigint) => void;
-  onToggleVisibility: (id: bigint) => void;
-  isAnyPending: boolean;
-  isTogglingVisibility: boolean;
+  onRevoke: (id: bigint) => Promise<void>;
+  onToggleVisibility: (id: bigint) => Promise<void>;
 }) {
+  const [isTogglingVis, setIsTogglingVis] = useState(false);
+  const [isRevoking, setIsRevoking] = useState(false);
+  const isBusy = isTogglingVis || isRevoking;
+
+  const handleToggle = async () => {
+    if (isBusy) return;
+    setIsTogglingVis(true);
+    try {
+      await onToggleVisibility(pharmacy.id);
+    } finally {
+      setIsTogglingVis(false);
+    }
+  };
+
+  const handleRevoke = async () => {
+    if (isBusy) return;
+    setIsRevoking(true);
+    try {
+      await onRevoke(pharmacy.id);
+    } finally {
+      setIsRevoking(false);
+    }
+  };
+
   return (
     <div
       data-ocid={`admin.approved.item.${index}`}
@@ -1145,31 +1228,502 @@ function ApprovedPharmacyCard({
           className={
             pharmacy.visible ? "pharma-btn-danger" : "pharma-btn-success"
           }
-          onClick={() => onToggleVisibility(pharmacy.id)}
-          disabled={isAnyPending || isTogglingVisibility}
+          onClick={handleToggle}
+          disabled={isBusy}
           style={{
-            opacity: isAnyPending || isTogglingVisibility ? 0.6 : 1,
+            opacity: isBusy ? 0.6 : 1,
             minHeight: 44,
             fontSize: "13px",
           }}
         >
-          {pharmacy.visible ? "👁️ Masquer" : "👁️ Afficher"}
+          {isTogglingVis ? (
+            <>
+              <BtnSpinner />
+              En cours…
+            </>
+          ) : pharmacy.visible ? (
+            "👁️ Masquer"
+          ) : (
+            "👁️ Afficher"
+          )}
         </button>
         <button
           type="button"
           data-ocid={`admin.revoke.button.${index}`}
           className="pharma-btn-danger"
-          onClick={() => onRevoke(pharmacy.id)}
-          disabled={isAnyPending || isTogglingVisibility}
+          onClick={handleRevoke}
+          disabled={isBusy}
           style={{
-            opacity: isAnyPending || isTogglingVisibility ? 0.6 : 1,
+            opacity: isBusy ? 0.6 : 1,
             minHeight: 44,
             fontSize: "13px",
           }}
         >
-          🔄 Révoquer
+          {isRevoking ? (
+            <>
+              <BtnSpinner />
+              En cours…
+            </>
+          ) : (
+            "🔄 Révoquer"
+          )}
         </button>
       </div>
+    </div>
+  );
+}
+
+// ─── Screen: PHARMACIST ───────────────────────────────────────────────────────
+function PharmacistScreen({
+  onBack,
+  onViewPublic,
+}: {
+  onBack: () => void;
+  onViewPublic: () => void;
+}) {
+  const [searchNom, setSearchNom] = useState("");
+  const [pharmacy, setPharmacy] = useState<Pharmacy | null>(null);
+  const [notFound, setNotFound] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
+
+  const { mutateAsync: getPharmacyByName, isPending: isSearching } =
+    useGetPharmacyByName();
+  const { mutateAsync: setOpenStatus, isPending: isTogglingOpen } =
+    useSetPharmacyOpenStatus();
+
+  const handleSearch = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!searchNom.trim()) return;
+      setNotFound(false);
+      setPharmacy(null);
+      setHasSearched(true);
+      try {
+        const result = await getPharmacyByName(searchNom.trim());
+        if (result) {
+          setPharmacy(result);
+          setNotFound(false);
+        } else {
+          setNotFound(true);
+        }
+      } catch {
+        setNotFound(true);
+      }
+    },
+    [searchNom, getPharmacyByName],
+  );
+
+  const handleToggleOpen = useCallback(async () => {
+    if (!pharmacy) return;
+    const newStatus = !pharmacy.ouvert;
+    try {
+      await setOpenStatus({ id: pharmacy.id, isOpen: newStatus });
+      setPharmacy((prev) => (prev ? { ...prev, ouvert: newStatus } : prev));
+    } catch {
+      // silently fail
+    }
+  }, [pharmacy, setOpenStatus]);
+
+  return (
+    <div
+      className="screen-fade-in"
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        padding: "0 1rem",
+      }}
+    >
+      {/* Header */}
+      <header
+        style={{
+          paddingTop: "1.5rem",
+          paddingBottom: "1.5rem",
+          display: "flex",
+          alignItems: "center",
+          gap: "0.75rem",
+        }}
+      >
+        <BackButton onClick={onBack} />
+        <div>
+          <h2
+            style={{
+              fontSize: "1.25rem",
+              fontWeight: 700,
+              color: "#ffffff",
+              margin: 0,
+              lineHeight: 1.2,
+            }}
+          >
+            Mon espace pharmacie
+          </h2>
+          <p style={{ color: "#888888", fontSize: "13px", margin: 0 }}>
+            Gérez le statut de votre pharmacie
+          </p>
+        </div>
+      </header>
+
+      <main style={{ flex: 1 }}>
+        {/* Search form */}
+        <form onSubmit={handleSearch} noValidate>
+          <div style={{ marginBottom: "1.25rem" }}>
+            <label
+              htmlFor="pharmacist-search"
+              style={{
+                display: "block",
+                color: "#cccccc",
+                fontSize: "14px",
+                fontWeight: 600,
+                marginBottom: "0.5rem",
+              }}
+            >
+              Nom de votre pharmacie
+            </label>
+            <input
+              id="pharmacist-search"
+              data-ocid="pharmacist.search_input"
+              className="pharma-input"
+              type="text"
+              value={searchNom}
+              onChange={(e) => setSearchNom(e.target.value)}
+              placeholder="Ex: Pharmacie Centrale Gombe"
+            />
+          </div>
+          <button
+            data-ocid="pharmacist.search.button"
+            type="submit"
+            className="pharma-btn-primary"
+            disabled={isSearching || !searchNom.trim()}
+            style={{
+              opacity: isSearching || !searchNom.trim() ? 0.7 : 1,
+              minHeight: "56px",
+              fontSize: "1rem",
+              marginBottom: "1.5rem",
+            }}
+          >
+            {isSearching ? (
+              <>
+                <BtnSpinner />
+                Recherche…
+              </>
+            ) : (
+              <>🔍 Rechercher</>
+            )}
+          </button>
+        </form>
+
+        {/* Not found */}
+        {hasSearched && notFound && (
+          <div
+            data-ocid="pharmacist.error_state"
+            style={{
+              background: "#2e0a0a",
+              border: "1px solid #c62828",
+              borderRadius: "0.75rem",
+              padding: "1rem 1.25rem",
+              color: "#ff5252",
+              fontSize: "15px",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.625rem",
+            }}
+          >
+            <span style={{ fontSize: "1.25rem", flexShrink: 0 }}>❌</span>
+            Pharmacie introuvable. Vérifiez le nom exact.
+          </div>
+        )}
+
+        {/* Pending */}
+        {pharmacy && pharmacy.statut === "en_attente" && (
+          <div
+            data-ocid="pharmacist.pending.card"
+            style={{
+              background: "#2e1a00",
+              border: "1px solid #ffb30055",
+              borderRadius: "0.875rem",
+              padding: "1.5rem",
+              textAlign: "center",
+            }}
+          >
+            <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>⏳</div>
+            <h3
+              style={{
+                fontSize: "1.125rem",
+                fontWeight: 700,
+                color: "#ffb300",
+                marginBottom: "0.75rem",
+              }}
+            >
+              En attente d'approbation
+            </h3>
+            <p style={{ color: "#cccccc", fontSize: "15px", lineHeight: 1.65 }}>
+              Votre pharmacie{" "}
+              <strong style={{ color: "#ffb300" }}>{pharmacy.nom}</strong> est
+              en cours de vérification par l'administrateur.
+            </p>
+            <p
+              style={{
+                color: "#aaaaaa",
+                fontSize: "13px",
+                marginTop: "0.75rem",
+                lineHeight: 1.6,
+              }}
+            >
+              Une fois approuvée, revenez ici et recherchez votre pharmacie pour
+              accéder à votre espace de gestion.
+            </p>
+          </div>
+        )}
+
+        {/* Rejected */}
+        {pharmacy && pharmacy.statut === "rejete" && (
+          <div
+            data-ocid="pharmacist.rejected.card"
+            style={{
+              background: "#2e0a0a",
+              border: "1px solid #c62828",
+              borderRadius: "0.875rem",
+              padding: "1.5rem",
+              textAlign: "center",
+            }}
+          >
+            <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>🚫</div>
+            <h3
+              style={{
+                fontSize: "1.125rem",
+                fontWeight: 700,
+                color: "#ff5252",
+                marginBottom: "0.75rem",
+              }}
+            >
+              Demande refusée
+            </h3>
+            <p style={{ color: "#cccccc", fontSize: "15px", lineHeight: 1.65 }}>
+              Votre demande a été refusée. Contactez l'administrateur pour plus
+              d'informations.
+            </p>
+          </div>
+        )}
+
+        {/* Approved: full pharmacist dashboard */}
+        {pharmacy && pharmacy.statut === "approuve" && (
+          <div
+            data-ocid="pharmacist.dashboard.card"
+            style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
+          >
+            {/* Approval banner */}
+            <div
+              style={{
+                background: "#0a2e17",
+                border: "1px solid #00c85355",
+                borderRadius: "0.875rem",
+                padding: "1rem 1.25rem",
+                display: "flex",
+                alignItems: "flex-start",
+                gap: "0.75rem",
+              }}
+            >
+              <span style={{ fontSize: "1.375rem", flexShrink: 0 }}>✅</span>
+              <div>
+                <p
+                  style={{
+                    color: "#00c853",
+                    fontWeight: 700,
+                    fontSize: "15px",
+                    marginBottom: "0.25rem",
+                  }}
+                >
+                  Pharmacie approuvée
+                </p>
+                <p
+                  style={{
+                    color: "#aaaaaa",
+                    fontSize: "13px",
+                    lineHeight: 1.55,
+                    margin: 0,
+                  }}
+                >
+                  Votre pharmacie a été validée par l'administrateur. Vous avez
+                  maintenant accès à votre espace pour gérer le statut
+                  ouvert/fermé.
+                </p>
+              </div>
+            </div>
+
+            {/* Pharmacy name */}
+            <div className="pharma-card" style={{ padding: "1.25rem" }}>
+              <p
+                style={{
+                  color: "#666666",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                  marginBottom: "0.375rem",
+                }}
+              >
+                Votre pharmacie
+              </p>
+              <h3
+                style={{
+                  fontSize: "1.375rem",
+                  fontWeight: 800,
+                  color: "#ffffff",
+                  lineHeight: 1.2,
+                  marginBottom: "1rem",
+                }}
+              >
+                {pharmacy.nom}
+              </h3>
+
+              {/* Address */}
+              <p
+                style={{
+                  color: "#cccccc",
+                  fontSize: "15px",
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: "0.5rem",
+                  marginBottom: "0.625rem",
+                }}
+              >
+                <span style={{ flexShrink: 0, marginTop: "2px" }}>📍</span>
+                {pharmacy.adresse}
+              </p>
+
+              {/* Phone */}
+              <p
+                style={{
+                  color: "#cccccc",
+                  fontSize: "15px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                }}
+              >
+                <span style={{ flexShrink: 0 }}>📞</span>
+                {pharmacy.tel}
+              </p>
+            </div>
+
+            {/* Open/Closed toggle */}
+            <div
+              className="pharma-card"
+              style={{ padding: "1.25rem", textAlign: "center" }}
+            >
+              <p
+                style={{
+                  color: "#666666",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                  marginBottom: "0.875rem",
+                }}
+              >
+                Statut actuel
+              </p>
+
+              {/* Status badge */}
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.625rem",
+                  background: pharmacy.ouvert ? "#0a2e17" : "#1a0a0a",
+                  border: `2px solid ${pharmacy.ouvert ? "#00c853" : "#ff5252"}`,
+                  borderRadius: "9999px",
+                  padding: "0.625rem 1.5rem",
+                  marginBottom: "1.25rem",
+                }}
+              >
+                <span style={{ fontSize: "1.25rem" }}>
+                  {pharmacy.ouvert ? "🟢" : "🔴"}
+                </span>
+                <span
+                  style={{
+                    fontSize: "1.125rem",
+                    fontWeight: 800,
+                    color: pharmacy.ouvert ? "#00c853" : "#ff5252",
+                    letterSpacing: "0.05em",
+                  }}
+                >
+                  {pharmacy.ouvert ? "OUVERT" : "FERMÉ"}
+                </span>
+              </div>
+
+              <button
+                type="button"
+                data-ocid="pharmacist.toggle_open.toggle"
+                className={
+                  pharmacy.ouvert ? "pharma-btn-danger" : "pharma-btn-success"
+                }
+                onClick={handleToggleOpen}
+                disabled={isTogglingOpen}
+                style={{
+                  opacity: isTogglingOpen ? 0.7 : 1,
+                  minHeight: "56px",
+                  fontSize: "1rem",
+                  width: "100%",
+                }}
+              >
+                {isTogglingOpen ? (
+                  <>
+                    <BtnSpinner />
+                    Mise à jour…
+                  </>
+                ) : pharmacy.ouvert ? (
+                  <>🔴 Fermer ma pharmacie</>
+                ) : (
+                  <>🟢 Ouvrir ma pharmacie</>
+                )}
+              </button>
+
+              <p
+                style={{
+                  color: "#666666",
+                  fontSize: "13px",
+                  marginTop: "0.875rem",
+                  lineHeight: 1.5,
+                }}
+              >
+                ℹ️ Ce statut est visible par les utilisateurs qui cherchent une
+                pharmacie.
+              </p>
+            </div>
+
+            {/* View public space */}
+            <button
+              type="button"
+              data-ocid="pharmacist.view_public.button"
+              className="pharma-btn-secondary"
+              onClick={onViewPublic}
+              style={{ minHeight: "56px", fontSize: "1rem", width: "100%" }}
+            >
+              <span style={{ fontSize: "1.125rem" }}>🌍</span>
+              Voir l'espace public
+            </button>
+          </div>
+        )}
+      </main>
+
+      <footer
+        style={{
+          paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))",
+          paddingTop: "1.5rem",
+        }}
+      >
+        <button
+          type="button"
+          data-ocid="pharmacist.back.button"
+          className="pharma-btn-secondary"
+          onClick={onBack}
+          style={{ fontSize: "16px", minHeight: "48px" }}
+        >
+          <BackIcon />
+          Retour à l'accueil
+        </button>
+      </footer>
     </div>
   );
 }
@@ -1186,17 +1740,16 @@ function AdminScreen({ onBack }: { onBack: () => void }) {
   const [pwError, setPwError] = useState(false);
 
   const { data: allPharmacies, isLoading: pharmaLoading } = useAllPharmacies();
-  const { mutate: approve, isPending: isApproving } = useApprovePharmacy();
-  const { mutate: reject, isPending: isRejecting } = useRejectPharmacy();
-  const { mutate: revoke, isPending: isRevoking } = useRevokePharmacy();
-  const { mutate: toggleVisibility, isPending: isTogglingVisibility } =
-    useTogglePharmacyVisibility();
+  const { mutateAsync: approve } = useApprovePharmacy();
+  const { mutateAsync: reject } = useRejectPharmacy();
+  const { mutateAsync: revoke } = useRevokePharmacy();
+  const { mutateAsync: toggleVisibility } = useTogglePharmacyVisibility();
   const { mutate: initSeed, isPending: isSeeding } = useInitializeSeedData();
 
   const [seedDone, setSeedDone] = useState(false);
-  const [activeTab, setActiveTab] = useState<"pending" | "approved" | "stats">(
-    "pending",
-  );
+  const [activeTab, setActiveTab] = useState<
+    "pending" | "approved" | "stats" | "public"
+  >("pending");
 
   useEffect(() => {
     if (adminAuthed && !seedDone && !isSeeding) {
@@ -1204,6 +1757,34 @@ function AdminScreen({ onBack }: { onBack: () => void }) {
       initSeed();
     }
   }, [adminAuthed, seedDone, isSeeding, initSeed]);
+
+  const handleApprove = useCallback(
+    async (id: bigint) => {
+      await approve(id);
+    },
+    [approve],
+  );
+
+  const handleReject = useCallback(
+    async (id: bigint) => {
+      await reject(id);
+    },
+    [reject],
+  );
+
+  const handleRevoke = useCallback(
+    async (id: bigint) => {
+      await revoke(id);
+    },
+    [revoke],
+  );
+
+  const handleToggleVisibility = useCallback(
+    async (id: bigint) => {
+      await toggleVisibility(id);
+    },
+    [toggleVisibility],
+  );
 
   const handlePasswordSubmit = useCallback(
     (e: React.FormEvent) => {
@@ -1236,9 +1817,6 @@ function AdminScreen({ onBack }: { onBack: () => void }) {
     allPharmacies?.filter((p) => p.statut === "approuve") ?? [];
   const visiblePharmacies =
     allPharmacies?.filter((p) => p.statut === "approuve" && p.visible) ?? [];
-
-  const isMutating =
-    isApproving || isRejecting || isRevoking || isTogglingVisibility;
 
   return (
     <div
@@ -1486,6 +2064,29 @@ function AdminScreen({ onBack }: { onBack: () => void }) {
               >
                 📊 Statistiques
               </button>
+              <button
+                type="button"
+                data-ocid="admin.public.tab"
+                className={`tab-btn ${activeTab === "public" ? "tab-btn-active" : "tab-btn-inactive"}`}
+                onClick={() => setActiveTab("public")}
+              >
+                🌍 Vue public
+                {visiblePharmacies.length > 0 && (
+                  <span
+                    style={{
+                      background: activeTab === "public" ? "#000" : "#00c853",
+                      color: activeTab === "public" ? "#00c853" : "#000",
+                      borderRadius: "9999px",
+                      padding: "0 6px",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      marginLeft: "0.375rem",
+                    }}
+                  >
+                    {visiblePharmacies.length}
+                  </span>
+                )}
+              </button>
             </div>
 
             {pharmaLoading || isSeeding ? (
@@ -1520,9 +2121,8 @@ function AdminScreen({ onBack }: { onBack: () => void }) {
                         key={p.id.toString()}
                         pharmacy={p}
                         index={i + 1}
-                        onApprove={(id) => approve(id)}
-                        onReject={(id) => reject(id)}
-                        isAnyPending={isMutating}
+                        onApprove={handleApprove}
+                        onReject={handleReject}
                       />
                     ))}
                   </div>
@@ -1556,11 +2156,115 @@ function AdminScreen({ onBack }: { onBack: () => void }) {
                         key={p.id.toString()}
                         pharmacy={p}
                         index={i + 1}
-                        onRevoke={(id) => revoke(id)}
-                        onToggleVisibility={(id) => toggleVisibility(id)}
-                        isAnyPending={isMutating}
-                        isTogglingVisibility={isTogglingVisibility}
+                        onRevoke={handleRevoke}
+                        onToggleVisibility={handleToggleVisibility}
                       />
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : /* ─── Public Tab ─── */
+            activeTab === "public" ? (
+              <div data-ocid="admin.public.list">
+                {visiblePharmacies.length === 0 ? (
+                  <div
+                    data-ocid="admin.public.empty_state"
+                    className="pharma-card"
+                    style={{ padding: "2rem", textAlign: "center" }}
+                  >
+                    <p style={{ fontSize: "2rem", marginBottom: "0.75rem" }}>
+                      🌍
+                    </p>
+                    <p style={{ color: "#888888", fontSize: "16px" }}>
+                      Aucune pharmacie visible pour le public.
+                    </p>
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.875rem",
+                    }}
+                  >
+                    {visiblePharmacies.map((p, i) => (
+                      <div
+                        key={p.id.toString()}
+                        data-ocid={`admin.public.item.${i + 1}`}
+                        className="pharma-card"
+                        style={{ padding: "1rem" }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "flex-start",
+                            gap: "0.5rem",
+                            marginBottom: "0.5rem",
+                          }}
+                        >
+                          <p
+                            style={{
+                              fontWeight: 700,
+                              fontSize: "1rem",
+                              color: "#ffffff",
+                              margin: 0,
+                              flex: 1,
+                            }}
+                          >
+                            {p.nom}
+                          </p>
+                          <span
+                            style={{
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              padding: "2px 8px",
+                              borderRadius: "9999px",
+                              background: p.ouvert ? "#0a2e17" : "#2e0a0a",
+                              color: p.ouvert ? "#00c853" : "#ff5252",
+                              border: `1px solid ${p.ouvert ? "#00c85355" : "#ff525255"}`,
+                              flexShrink: 0,
+                            }}
+                          >
+                            {p.ouvert ? "🟢 Ouvert" : "🔴 Fermé"}
+                          </span>
+                        </div>
+                        <p
+                          style={{
+                            color: "#888888",
+                            fontSize: "14px",
+                            marginBottom: "0.25rem",
+                          }}
+                        >
+                          📍 {p.adresse}
+                        </p>
+                        <p
+                          style={{
+                            color: "#888888",
+                            fontSize: "14px",
+                            marginBottom: "1rem",
+                          }}
+                        >
+                          📞 {p.tel}
+                        </p>
+                        <a
+                          data-ocid={`admin.public.call.button.${i + 1}`}
+                          href={`tel:${p.tel}`}
+                          className="pharma-btn-success"
+                          style={{
+                            textDecoration: "none",
+                            minHeight: 44,
+                            fontSize: "14px",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: "0.5rem",
+                            borderRadius: "0.75rem",
+                          }}
+                        >
+                          📞 Appeler
+                        </a>
+                      </div>
                     ))}
                   </div>
                 )}
@@ -1745,6 +2449,12 @@ export default function App() {
       {screen === "nearby" && <NearbyScreen onBack={goHome} />}
       {screen === "register" && <RegisterScreen onBack={goHome} />}
       {screen === "admin" && <AdminScreen onBack={goHome} />}
+      {screen === "pharmacien" && (
+        <PharmacistScreen
+          onBack={goHome}
+          onViewPublic={() => setScreen("nearby")}
+        />
+      )}
     </div>
   );
 }

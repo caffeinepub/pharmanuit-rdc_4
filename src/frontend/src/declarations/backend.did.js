@@ -20,6 +20,7 @@ export const Pharmacy = IDL.Record({
   'nom' : IDL.Text,
   'tel' : IDL.Text,
   'statut' : IDL.Text,
+  'ouvert' : IDL.Bool,
   'approuve' : IDL.Bool,
   'visible' : IDL.Bool,
   'adresse' : IDL.Text,
@@ -34,6 +35,7 @@ export const idlService = IDL.Service({
   'getApprovedPharmacies' : IDL.Func([], [IDL.Vec(Pharmacy)], ['query']),
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
+  'getPharmacyByName' : IDL.Func([IDL.Text], [IDL.Opt(Pharmacy)], ['query']),
   'getUserProfile' : IDL.Func(
       [IDL.Principal],
       [IDL.Opt(UserProfile)],
@@ -44,11 +46,8 @@ export const idlService = IDL.Service({
   'rejectPharmacy' : IDL.Func([IDL.Nat], [IDL.Bool], []),
   'revokePharmacy' : IDL.Func([IDL.Nat], [IDL.Bool], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
-  'submitPharmacy' : IDL.Func(
-      [IDL.Text, IDL.Text, IDL.Text, IDL.Float64, IDL.Float64],
-      [IDL.Nat],
-      [],
-    ),
+  'setPharmacyOpenStatus' : IDL.Func([IDL.Nat, IDL.Bool], [IDL.Bool], []),
+  'submitPharmacy' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Nat], []),
   'togglePharmacyVisibility' : IDL.Func([IDL.Nat], [IDL.Bool], []),
 });
 
@@ -67,6 +66,7 @@ export const idlFactory = ({ IDL }) => {
     'nom' : IDL.Text,
     'tel' : IDL.Text,
     'statut' : IDL.Text,
+    'ouvert' : IDL.Bool,
     'approuve' : IDL.Bool,
     'visible' : IDL.Bool,
     'adresse' : IDL.Text,
@@ -81,6 +81,7 @@ export const idlFactory = ({ IDL }) => {
     'getApprovedPharmacies' : IDL.Func([], [IDL.Vec(Pharmacy)], ['query']),
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
+    'getPharmacyByName' : IDL.Func([IDL.Text], [IDL.Opt(Pharmacy)], ['query']),
     'getUserProfile' : IDL.Func(
         [IDL.Principal],
         [IDL.Opt(UserProfile)],
@@ -91,11 +92,8 @@ export const idlFactory = ({ IDL }) => {
     'rejectPharmacy' : IDL.Func([IDL.Nat], [IDL.Bool], []),
     'revokePharmacy' : IDL.Func([IDL.Nat], [IDL.Bool], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
-    'submitPharmacy' : IDL.Func(
-        [IDL.Text, IDL.Text, IDL.Text, IDL.Float64, IDL.Float64],
-        [IDL.Nat],
-        [],
-      ),
+    'setPharmacyOpenStatus' : IDL.Func([IDL.Nat, IDL.Bool], [IDL.Bool], []),
+    'submitPharmacy' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Nat], []),
     'togglePharmacyVisibility' : IDL.Func([IDL.Nat], [IDL.Bool], []),
   });
 };

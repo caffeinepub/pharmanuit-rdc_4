@@ -17,6 +17,7 @@ export interface Pharmacy {
   'nom' : string,
   'tel' : string,
   'statut' : string,
+  'ouvert' : boolean,
   'approuve' : boolean,
   'visible' : boolean,
   'adresse' : string,
@@ -33,16 +34,15 @@ export interface _SERVICE {
   'getApprovedPharmacies' : ActorMethod<[], Array<Pharmacy>>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
+  'getPharmacyByName' : ActorMethod<[string], [] | [Pharmacy]>,
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
   'initializeSeedData' : ActorMethod<[], undefined>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'rejectPharmacy' : ActorMethod<[bigint], boolean>,
   'revokePharmacy' : ActorMethod<[bigint], boolean>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
-  'submitPharmacy' : ActorMethod<
-    [string, string, string, number, number],
-    bigint
-  >,
+  'setPharmacyOpenStatus' : ActorMethod<[bigint, boolean], boolean>,
+  'submitPharmacy' : ActorMethod<[string, string, string], bigint>,
   'togglePharmacyVisibility' : ActorMethod<[bigint], boolean>,
 }
 export declare const idlService: IDL.ServiceClass;

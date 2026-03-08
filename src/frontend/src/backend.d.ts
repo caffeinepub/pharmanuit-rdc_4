@@ -14,6 +14,7 @@ export interface Pharmacy {
     nom: string;
     tel: string;
     statut: string;
+    ouvert: boolean;
     approuve: boolean;
     visible: boolean;
     adresse: string;
@@ -33,12 +34,14 @@ export interface backendInterface {
     getApprovedPharmacies(): Promise<Array<Pharmacy>>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
+    getPharmacyByName(nom: string): Promise<Pharmacy | null>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     initializeSeedData(): Promise<void>;
     isCallerAdmin(): Promise<boolean>;
     rejectPharmacy(id: bigint): Promise<boolean>;
     revokePharmacy(id: bigint): Promise<boolean>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
-    submitPharmacy(nom: string, tel: string, adresse: string, lat: number, lng: number): Promise<bigint>;
+    setPharmacyOpenStatus(id: bigint, isOpen: boolean): Promise<boolean>;
+    submitPharmacy(nom: string, tel: string, adresse: string): Promise<bigint>;
     togglePharmacyVisibility(id: bigint): Promise<boolean>;
 }

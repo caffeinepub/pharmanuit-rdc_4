@@ -5,12 +5,11 @@ import Float "mo:core/Float";
 import Array "mo:core/Array";
 import Order "mo:core/Order";
 import Nat "mo:core/Nat";
-import Migration "migration";
+import Iter "mo:core/Iter";
 import Principal "mo:core/Principal";
 import MixinAuthorization "authorization/MixinAuthorization";
 import AccessControl "authorization/access-control";
 
-(with migration = Migration.run)
 actor {
   type Pharmacy = {
     id : Nat;
@@ -22,6 +21,7 @@ actor {
     statut : Text;
     approuve : Bool;
     visible : Bool;
+    ouvert : Bool;
   };
 
   public type UserProfile = {
@@ -36,13 +36,10 @@ actor {
 
   let pharmacies = Map.empty<Nat, Pharmacy>();
   let userProfiles = Map.empty<Principal, UserProfile>();
-
   var nextId = 8;
-
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
 
-  // User Profile Functions
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can access profiles");
@@ -64,19 +61,19 @@ actor {
     userProfiles.add(caller, profile);
   };
 
-  // Pharmacy Functions
-  public shared ({ caller }) func submitPharmacy(nom : Text, tel : Text, adresse : Text, lat : Float, lng : Float) : async Nat {
+  public shared ({ caller }) func submitPharmacy(nom : Text, tel : Text, adresse : Text) : async Nat {
     let id = nextId;
     let pharmacy : Pharmacy = {
       id;
       nom;
       tel;
       adresse;
-      lat;
-      lng;
+      lat = 0.0;
+      lng = 0.0;
       statut = "en_attente";
       approuve = false;
       visible = false;
+      ouvert = false;
     };
     pharmacies.add(id, pharmacy);
     nextId += 1;
@@ -90,9 +87,6 @@ actor {
   };
 
   public query ({ caller }) func getAllPharmacies() : async [Pharmacy] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only admins can access this endpoint");
-    };
     pharmacies.values().toArray();
   };
 
@@ -113,6 +107,7 @@ actor {
           statut = "approuve";
           approuve = true;
           visible = true;
+          ouvert = pharmacy.ouvert;
         };
         pharmacies.add(id, updatedPharmacy);
         true;
@@ -137,6 +132,7 @@ actor {
           statut = "rejete";
           approuve = false;
           visible = false;
+          ouvert = pharmacy.ouvert;
         };
         pharmacies.add(id, updatedPharmacy);
         true;
@@ -161,6 +157,7 @@ actor {
           statut = "en_attente";
           approuve = false;
           visible = false;
+          ouvert = pharmacy.ouvert;
         };
         pharmacies.add(id, updatedPharmacy);
         true;
@@ -186,6 +183,7 @@ actor {
           statut = pharmacy.statut;
           approuve = pharmacy.approuve;
           visible = not pharmacy.visible;
+          ouvert = pharmacy.ouvert;
         };
         pharmacies.add(id, updatedPharmacy);
         true;
@@ -193,7 +191,41 @@ actor {
     };
   };
 
-  // Initialize with seed data
+  public query ({ caller }) func getPharmacyByName(nom : Text) : async ?Pharmacy {
+    let lowerNom = nom.toLower();
+    pharmacies.values().find(
+      func(pharmacy) {
+        pharmacy.nom.toLower().contains(#text lowerNom);
+      }
+    );
+  };
+
+  public shared ({ caller }) func setPharmacyOpenStatus(id : Nat, isOpen : Bool) : async Bool {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only authenticated users can update pharmacy status");
+    };
+
+    switch (pharmacies.get(id)) {
+      case (null) { false };
+      case (?pharmacy) {
+        let updatedPharmacy = {
+          id = pharmacy.id;
+          nom = pharmacy.nom;
+          tel = pharmacy.tel;
+          adresse = pharmacy.adresse;
+          lat = pharmacy.lat;
+          lng = pharmacy.lng;
+          statut = pharmacy.statut;
+          approuve = pharmacy.approuve;
+          visible = pharmacy.visible;
+          ouvert = isOpen;
+        };
+        pharmacies.add(id, updatedPharmacy);
+        true;
+      };
+    };
+  };
+
   public shared ({ caller }) func initializeSeedData() : async () {
     if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
       Runtime.trap("Unauthorized: Only admins can initialize seed data");
@@ -210,6 +242,7 @@ actor {
         statut = "approuve";
         approuve = true;
         visible = true;
+        ouvert = true;
       },
       {
         id = 2;
@@ -221,6 +254,7 @@ actor {
         statut = "approuve";
         approuve = true;
         visible = true;
+        ouvert = true;
       },
       {
         id = 3;
@@ -232,6 +266,7 @@ actor {
         statut = "approuve";
         approuve = true;
         visible = true;
+        ouvert = true;
       },
       {
         id = 4;
@@ -243,6 +278,7 @@ actor {
         statut = "approuve";
         approuve = true;
         visible = true;
+        ouvert = true;
       },
       {
         id = 5;
@@ -254,6 +290,7 @@ actor {
         statut = "approuve";
         approuve = true;
         visible = true;
+        ouvert = true;
       },
       {
         id = 6;
@@ -265,6 +302,7 @@ actor {
         statut = "en_attente";
         approuve = false;
         visible = false;
+        ouvert = false;
       },
       {
         id = 7;
@@ -276,6 +314,7 @@ actor {
         statut = "en_attente";
         approuve = false;
         visible = false;
+        ouvert = false;
       },
     ];
 
