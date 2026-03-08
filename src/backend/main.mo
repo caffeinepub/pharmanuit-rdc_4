@@ -1,15 +1,21 @@
 import Text "mo:core/Text";
 import Map "mo:core/Map";
-import Runtime "mo:core/Runtime";
 import Float "mo:core/Float";
-import Array "mo:core/Array";
 import Order "mo:core/Order";
 import Nat "mo:core/Nat";
-import Iter "mo:core/Iter";
 import Principal "mo:core/Principal";
-import MixinAuthorization "authorization/MixinAuthorization";
-import AccessControl "authorization/access-control";
 
+(with migration =
+  func (old : {
+    accessControlState : {
+      var adminAssigned : Bool;
+      userRoles : Map.Map<Principal, { #admin; #user; #guest }>;
+    };
+    userProfiles : Map.Map<Principal, { name : Text }>;
+  }) : {} {
+    {}
+  }
+)
 actor {
   type Pharmacy = {
     id : Nat;
@@ -24,10 +30,6 @@ actor {
     ouvert : Bool;
   };
 
-  public type UserProfile = {
-    name : Text;
-  };
-
   module Pharmacy {
     public func compare(pharmacy1 : Pharmacy, pharmacy2 : Pharmacy) : Order.Order {
       Nat.compare(pharmacy1.id, pharmacy2.id);
@@ -35,31 +37,7 @@ actor {
   };
 
   let pharmacies = Map.empty<Nat, Pharmacy>();
-  let userProfiles = Map.empty<Principal, UserProfile>();
   var nextId = 8;
-  let accessControlState = AccessControl.initState();
-  include MixinAuthorization(accessControlState);
-
-  public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can access profiles");
-    };
-    userProfiles.get(caller);
-  };
-
-  public query ({ caller }) func getUserProfile(user : Principal) : async ?UserProfile {
-    if (caller != user and not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Can only view your own profile");
-    };
-    userProfiles.get(user);
-  };
-
-  public shared ({ caller }) func saveCallerUserProfile(profile : UserProfile) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can save profiles");
-    };
-    userProfiles.add(caller, profile);
-  };
 
   public shared ({ caller }) func submitPharmacy(nom : Text, tel : Text, adresse : Text) : async Nat {
     let id = nextId;
@@ -91,9 +69,6 @@ actor {
   };
 
   public shared ({ caller }) func approvePharmacy(id : Nat) : async Bool {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only admins can approve pharmacies");
-    };
     switch (pharmacies.get(id)) {
       case (null) { false };
       case (?pharmacy) {
@@ -116,9 +91,6 @@ actor {
   };
 
   public shared ({ caller }) func rejectPharmacy(id : Nat) : async Bool {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only admins can reject pharmacies");
-    };
     switch (pharmacies.get(id)) {
       case (null) { false };
       case (?pharmacy) {
@@ -141,9 +113,6 @@ actor {
   };
 
   public shared ({ caller }) func revokePharmacy(id : Nat) : async Bool {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only admins can revoke pharmacies");
-    };
     switch (pharmacies.get(id)) {
       case (null) { false };
       case (?pharmacy) {
@@ -166,10 +135,6 @@ actor {
   };
 
   public shared ({ caller }) func togglePharmacyVisibility(id : Nat) : async Bool {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only admins can toggle pharmacy visibility");
-    };
-
     switch (pharmacies.get(id)) {
       case (null) { false };
       case (?pharmacy) {
@@ -201,10 +166,6 @@ actor {
   };
 
   public shared ({ caller }) func setPharmacyOpenStatus(id : Nat, isOpen : Bool) : async Bool {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only authenticated users can update pharmacy status");
-    };
-
     switch (pharmacies.get(id)) {
       case (null) { false };
       case (?pharmacy) {
@@ -227,10 +188,6 @@ actor {
   };
 
   public shared ({ caller }) func initializeSeedData() : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only admins can initialize seed data");
-    };
-
     let initialPharmacies : [Pharmacy] = [
       {
         id = 1;

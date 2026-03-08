@@ -1,37 +1,31 @@
 # PharmaNuit RDC
 
 ## Current State
-- App mobile web pour trouver les pharmacies de nuit en RDC
-- Panneau admin caché (5 taps sur le logo + mot de passe)
-- Admin peut approuver, rejeter, révoquer les pharmacies
-- Deux onglets : "En attente" et "Approuvées"
-- Footer affiche "Built with love using caffeine.ai"
-- Les pharmacies approuvées sont toutes visibles automatiquement
+Application de gestion de pharmacies de nuit en RDC. Le backend Motoko gère les pharmacies avec des statuts (en_attente, approuve, rejete). L'accès admin dans le frontend est sécurisé par un mot de passe local (sessionStorage). Le backend utilise un système AccessControl ICP pour vérifier les permissions sur les fonctions admin.
+
+## Problème identifié
+Les fonctions `approvePharmacy`, `rejectPharmacy`, `revokePharmacy`, `togglePharmacyVisibility` exigent `AccessControl.hasPermission(accessControlState, caller, #admin)`. Or, l'administrateur se connecte uniquement via un mot de passe local dans le frontend -- il n'est pas enregistré comme admin ICP dans le canister. Résultat : tous les appels admin échouent silencieusement (Runtime.trap).
+
+De même, `setPharmacyOpenStatus` exige `#user` auth ICP, ce qui empêche les pharmaciens anonymes de mettre à jour leur statut.
 
 ## Requested Changes (Diff)
 
 ### Add
-- Champ `visible` (Bool) dans le type Pharmacy du backend
-- Fonction `togglePharmacyVisibility(id: Nat)` dans le backend
-- `getApprovedPharmacies` ne retourne que les pharmacies approuvées ET visibles
-- Onglet "Statistiques" dans le panneau admin avec : total enregistrées, en attente, visibles
-- Bouton toggle visibilité sur chaque pharmacie approuvée dans l'onglet admin
-- Les pharmacies invisibles restent dans la liste admin avec indicateur visuel "Masqué"
+- Rien à ajouter
 
 ### Modify
-- `getApprovedPharmacies` filtre maintenant aussi sur `visible == true`
-- `approvePharmacy` met `visible = true` par défaut lors de l'approbation
-- `initializeSeedData` inclut `visible = true` pour les pharmacies approuvées
-- `ApprovedPharmacyCard` : remplacer "Révoquer" par deux boutons : toggle visibilité + révoquer
-- Supprimer le lien "caffeine.ai" du footer de l'écran d'accueil
+- `approvePharmacy` : supprimer la vérification AccessControl admin, garder la logique de mise à jour
+- `rejectPharmacy` : supprimer la vérification AccessControl admin
+- `revokePharmacy` : supprimer la vérification AccessControl admin
+- `togglePharmacyVisibility` : supprimer la vérification AccessControl admin
+- `setPharmacyOpenStatus` : supprimer la vérification AccessControl user (accès libre pour permettre aux pharmaciens anonymes de gérer leur statut)
+- `initializeSeedData` : supprimer la vérification AccessControl admin
 
 ### Remove
-- Texte "Built with love using caffeine.ai" dans le footer
+- Les imports/usages AccessControl non nécessaires si plus aucune fonction les utilise
 
 ## Implementation Plan
-1. Mettre à jour main.mo : ajouter champ `visible`, fonction `togglePharmacyVisibility`, modifier `getApprovedPharmacies`
-2. Mettre à jour backend.d.ts avec la nouvelle interface
-3. Mettre à jour les hooks useQueries pour ajouter `useTogglePharmacyVisibility`
-4. Ajouter onglet Statistiques dans AdminScreen
-5. Ajouter bouton toggle visibilité dans ApprovedPharmacyCard
-6. Supprimer le footer caffeine.ai de HomeScreen
+1. Régénérer le backend Motoko avec toutes les mêmes fonctions mais sans les vérifications AccessControl sur les fonctions admin/pharmacien
+2. Conserver exactement le même modèle de données Pharmacy (id, nom, tel, adresse, lat, lng, statut, approuve, visible, ouvert)
+3. Conserver les seeds data identiques (IDs 1-7)
+4. nextId commence à 8
